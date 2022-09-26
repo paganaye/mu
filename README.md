@@ -91,10 +91,6 @@ Run Mu from your Javascript App or web page.
 ```
 Also, you can provide an entire JS Object or even a library.
 
-## Run Mu in a NodeJS with Mu-CLI
-
-[Mu-cli](https://github.com/mu-dev/mu-cli) is a command line tool what allows you to run Mu in NodeJS environment
-
 
 ## License
 A permissive [BSD 3-Clause License](https://github.com/mu-dev/mu/blob/master/LICENSE) 

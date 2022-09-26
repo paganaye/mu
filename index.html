@@ -1,0 +1,117 @@
+<html>
+
+<head>
+  <title>Mu dev</title>
+  <script src="./node_modules/ace-builds/src-noconflict/ace.js" type="text/javascript" charset="utf-8"></script>
+  <script src="./dist/mu-interpreter.js"></script>
+  <script src="./dist/assets/mode-mu.js"></script>
+  <style>
+    .container {
+      height: 100%;
+      min-width: 200px;
+      width: 90%;
+      margin: 10px auto;
+    }
+
+    #editor,
+    #resultEditor {
+      height: 40%;
+      display: block;
+      min-height: 20%;
+      width: 100%;
+      margin-top: 10px;
+      margin-bottom: 10px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h4>Mu development console</h4>
+    <div id="editor">
+# The code in this window is executed in the Mu interpreter
+# It all runs in the browser.
+# You can use the Mu interpreter to write your own code
+
+def sum(a,b):
+  return a + b
+  
+sum(10,20)
+  
+    </div>
+
+    <button onclick="tokenize()">Tokenize</button>
+    <button onclick="parse()">Parse</button>
+    <button onclick="runInterpreter()">Run</button>
+    <div id="resultEditor"> </div>
+
+    <!-- <textarea id="result"></textarea> -->
+  </div>
+  <script>
+
+    const editor = ace.edit("editor");
+    editor.setTheme("ace/theme/monokai");
+    editor.session.setMode("ace/mode/python");
+
+    const resultEditor = ace.edit("resultEditor");
+    resultEditor.setTheme("ace/theme/monokai");
+    resultEditor.session.setMode("ace/mode/json");
+
+    const interpreter = mu.Mu();
+    console.log({ interpreter });
+
+    function tokenize() {
+
+      ongotpointercapture
+      tokenizer = (s) => console.log(`tokens => ${s}`, Tokenizer.getAllTokens(code))
+      const scripts = editor.getValue();
+      try {
+        const result = mu.getAllTokens(scripts)
+          .map((t, i) => mu.formatToken(t))
+          .join('\n');
+
+        const data = typeof result === 'object' ? JSON.stringify(result, null, '\t') : result;
+        resultEditor.getSession().setValue(data)
+      } catch (err) {
+        console.error(err);
+        resultEditor.getSession().setValue(String(err.message))
+      }
+    }
+
+    function parse() {
+
+      const scripts = editor.getValue();
+      try {
+        const result = interpreter
+          .parse(scripts);
+
+        const data = typeof result === 'object' ? JSON.stringify(result, null, '\t') : result;
+        resultEditor.getSession().setValue(data)
+      } catch (err) {
+        console.error(err);
+        resultEditor.getSession().setValue(String(err.message))
+      }
+    }
+
+    async function runInterpreter() {
+
+      const scripts = editor.getValue();
+      try {
+
+
+        const result = await interpreter
+          .evalAsync(scripts, undefined);
+
+        const data = typeof result === 'object' ? JSON.stringify(result, null, '\t') : String(result);
+
+        resultEditor.getSession().setValue(data)
+      } catch (err) {
+        console.log('error', err);
+        resultEditor.getSession().setValue(String(err.message))
+      }
+    }
+
+  </script>
+</body>
+
+</html>
