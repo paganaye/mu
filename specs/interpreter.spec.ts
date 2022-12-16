@@ -1,7 +1,19 @@
 import { Mu, MuInterpreter } from '../src/runtime/MuInterpreter';
 
+let lastPrint: any[];
 let e: MuInterpreter;
-let lastPrint: any;
+
+type DynamicTitleTest = [string, () => void];
+
+function testEval(sourceCode: string, expectedValue: any, suffix = ""): DynamicTitleTest {
+  return [
+    sourceCode + " => " + expectedValue + suffix,
+    () => {
+      const actualValue = e.eval(sourceCode);
+      expect(actualValue).toEqual(expectedValue)
+    }
+  ];
+}
 
 beforeEach(() => {
   e = Mu()
@@ -13,6 +25,1245 @@ beforeEach(() => {
     .addFunction("returnsPromise", a1 => new Promise((s, f) => { setTimeout(() => s(a1), 10) }))
     .addFunction("add", (a, b, c, d) => { let r = a + b; if (c) { r += c; } if (d) { r += d; } return r; });
 });
+
+it('Test1', () => {
+  expect(e).toBe(e);
+});
+
+it('1+2', () => {
+  expect(e.eval("1+2")).toBe(3);
+  expect(e.eval("1+2+3")).toBe(6);
+});
+
+it(`"hello" + " " + "world"`, () => {
+  expect(e.eval(`"hello" + " " + "world"`)).toBe('hello world');
+});
+
+it(`""hello"" + " " + '"world"'`, () => {
+  expect(e.eval(`"'hello'" + \` \` + '"world"'`)).toBe(`'hello' "world"`);
+});
+
+it('(1 + 2) * 3', () => {
+  expect(e.eval("(1 + 2) * 3")).toBe(9);
+  expect(e.eval("(1 + 2) * 3 + 5")).toBe(14);
+});
+
+it('(1 + 2) * (3 + 5)', () => {
+  expect(e.eval("(1 + 2) * (3 + 5)")).toBe(24);
+  expect(e.eval("(1 + 2) * (3 + 4) -5")).toBe(16);
+
+  expect(e.eval("2*(3+4)")).toBe(14);
+  expect(e.eval("2*(3+4)+5")).toBe(19);
+});
+
+it('1+2*3', () => {
+  expect(e.eval("1 + 2 * 3")).toBe(1 + 2 * 3);
+  expect(e.eval("1 + 2 * 3 + 4")).toBe(1 + 2 * 3 + 4);
+});
+
+
+it('2 * 3 + 4 * 5', () => {
+  expect(e.eval("(1 + 2) + (3 + 4) * (5*6)")).toBe((1 + 2) + (3 + 4) * (5 * 6));
+  expect(e.eval("(1 + 2) + (3 + 4) * 5")).toBe((1 + 2) + (3 + 4) * 5);
+  expect(e.eval("2*3+4*5")).toBe(2 * 3 + 4 * 5);
+  expect(e.eval("2*(3+4)+5*6")).toBe(2 * (3 + 4) + 5 * 6);
+});
+
+it('2 * 3 + 4 * 5', () => {
+  expect(e.eval("1+2*1/4")).toBe(1 + 2 * 1 / 4)
+  expect(e.eval("1+2*1/2+3")).toBe(1 + 2 * 1 / 2 + 3)
+
+});
+
+it('1*2/4 + 2*3/6', () => {
+  expect(e.eval("1*2/4 + 2*3/6")).toBe(1 * 2 / 4 + 2 * 3 / 6)
+  expect(e.eval("1*2/4 + 2*3/6 - 2.3")).toBe(1 * 2 / 4 + 2 * 3 / 6 - 2.3)
+  expect(e.eval("7+1*2/4 + 2*3/6 - 2.3")).toBe(7 + 1 * 2 / 4 + 2 * 3 / 6 - 2.3)
+});
+
+it('5 – (5 * (32 + 4))', () => {
+  expect(e.eval("5 - (5 * (32 + 4))")).toBe(5 - (5 * (32 + 4)))
+  expect(e.eval("12 * 5 - (5 * (32 + 4)) + 3")).toBe(12 * 5 - (5 * (32 + 4)) + 3)
+});
+
+it('o.sub1', () => {
+  const obj = { o: { v1: 55 } };
+  expect(e.eval("o.v1", obj)).toBe(55)
+});
+
+it('o.sub1.subValue', () => {
+  const obj = { o: { v1: 55, sub1: { subValue: 45 } } };
+  expect(e.eval("o.v1 + o.sub1.subValue", obj)).toBe(100)
+  expect(e.eval(`o.v1 + o.sub1["sub" + "Value"]`, obj)).toBe(100)
+  expect(e.eval("o.v1 + o['sub1'].subValue", obj)).toBe(100)
+});
+
+it('assignment o.sub1.subValue', () => {
+  const obj = { o: { v1: 55, sub1: { subValue: 45 } } };
+  expect(e.eval("o.sub1.subValue2 = 10\no.sub1.subValue2", obj)).toBe(10)
+});
+
+it('def fn()', () => {
+  expect(e.eval([
+    "def fn():",
+    "    return 12",
+    "fn()"])).toBe(12)
+});
+
+it('def fn(x)', () => {
+  expect(e.eval([
+    "def fn(x):",
+    "    return x*2",
+    "fn(7)"])).toBe(14)
+});
+
+it('func call', () => {
+  const obj = { add: (x: number, y: number) => x + y };
+
+  expect(e.eval("add(2, 3)", obj)).toBe(5)
+  expect(e.eval("add(2+10, 3)", obj)).toBe(15)
+});
+
+
+it(`empty or special param`, () => {
+  expect(e.eval(`def f(p):\n  p\nf('')`)).toBe(``);
+  expect(e.eval(`def f(p):\n  p\nf('"')`)).toBe(`"`);
+  expect(e.eval(`def f(p):\n  p\nf("'")`)).toBe(`'`);
+  expect(e.eval(`def f(p):\n  p\nf(",")`)).toBe(`,`);
+  expect(e.eval(`def f(p):\n  p\nf(" ")`)).toBe(` `);
+  expect(e.eval(`def f(p):\n  p\nf(")")`)).toBe(`)`);
+  expect(e.eval(`def f(p):\n  p\nf("}")`)).toBe(`}`);
+});
+
+it('Object call', () => {
+  const obj = { o: { add: (x: number, y: number) => x + y } };
+
+  expect(e.eval("o.add(2, 3)", obj)).toBe(5)
+  expect(e.eval("o.add(2 * 10, 3)", obj)).toBe(23)
+  expect(e.eval(`
+    o.add(
+      2 * 10,
+      3
+      )`, obj)).toBe(23)
+
+});
+
+it('Object call2', () => {
+  const obj = {
+    o: {
+      add: (x: number, y: number) => x + y,
+      getObject: (p: string) => { return { p } }
+    }
+  };
+
+  expect(e.eval("o.getObject(5).p", obj)).toBe(5)
+  expect(e.eval("x = o.getObject(5)\nx.p * x.p", obj)).toBe(25)
+});
+
+it('json obj', () => {
+  expect(e.eval(`x = {m1: 1+2*3, m2: "ee"}\nx.m1`)).toBe(7);
+  expect(e.eval("x = {'m1': 1+2*3}\nx.m1")).toBe(7);
+});
+
+
+
+it('json with dynamic key', () => {
+  expect(e.eval(`
+p = "prop"
+x = { [p + "_"+1]: 1+2*3}
+x.prop_1`)).toBe(7);
+  expect(e.eval(`p = {x:"prop"}\nx = {[p.x + "_"+1]: 1+2*3}\nx.prop_1`)).toBe(7);
+});
+
+it('json single name prop', () => {
+  expect(e.eval([
+    "pp = 't1'",
+    "x = {pp}",
+    "x.pp"])).toBe('t1');
+  expect(e.eval([
+    "pp = 5",
+    "x = {pp, x:10}",
+    "x.pp + x.x"])).toBe(15);
+});
+
+it('json array', () => {
+  expect(e.eval(`x = [{m1: 1+2*3, m2: "ee"}]\nx.length`)).toBe(1);
+  expect(e.eval("x = [1,2,3]\nx.length")).toBe(3);
+  expect(e.eval("x = [1,2,3]\nx[1]")).toBe(2);
+  expect(e.eval("x = [{f1:1, f2:12}, {f1:2, f2:22}, {f1:3, f2:32}]\nx[1].f2")).toBe(22);
+  expect(e.eval("x = [{f1:1, f2:12}, {f1:2, f2:22}, {f1:3, f2:32}]\nx[1].f2 = 55\nx[1].f2")).toBe(55);
+});
+
+it('array map', () => {
+  const script = `
+    def fn(n):
+      {
+        t1: n * 2,
+        t2: n * 3
+      }
+        
+    arr = [1,2,3]
+    arr.map(fn)     
+    `;
+  const res = e.eval(script) as { t1: number, t2: number }[];
+
+  expect(res.length).toBe(3);
+  expect(res.map(o => o.t1 + o.t2).join(',')).toBe("5,10,15");
+});
+
+it('array map 2', () => {
+  const script = `
+  def map(n):
+    {
+      t1: n * 2,
+      t2: n * 3
+    }
+  
+  def map2(o):
+      o.t1 + o.t2
+  
+  arr = [1,2,3]
+  
+  arr
+      .map(map)
+      .map(map2)
+      .join(",")
+      `;
+  expect(e.eval(script)).toBe("5,10,15");
+});
+
+it('arrow functions', () => {
+  const script = `
+    arr = [1,2,3]
+    arr.map(n =>
+            n = n * 2
+            return {
+                t1: n * 2,
+                t2: n * 3
+            }).map(r => r.t1 * 8).join(',')     
+      `;
+  expect(e.eval(script)).toBe("32,64,96");
+});
+
+it('arrow functions with filter', () => {
+  const script = `
+    arr = [1,2,3]
+    arr.map(n =>
+        n = n * 2
+        {
+          t1: n * 2,
+          t2: n * 3
+        }
+      )
+      .filter(v => (v.t1 > 10) or (v.t2 > 10))
+      .map(r => r.t1 * r.t2)
+      .join(',')
+        `;
+  expect(e.eval(script)).toBe("96,216");
+});
+
+
+it('print empty string', () => {
+  const script = `
+    print(
+      ""
+    )
+    `;
+  expect(e.eval(script, { print: (v: string) => v })).toBe('');
+}
+
+);
+it('if condition', () => {
+  const script = (p: number) => `
+    x = 1
+    if x == ${p}:
+      x = 5
+    else:
+      x = 10
+    x
+          `;
+  expect(e.eval(script(1))).toBe(5);
+  expect(e.eval(script(2))).toBe(10);
+});
+
+it('if condition', () => {
+
+  expect(e.eval(`
+   x = {o1: {ov: 55}}
+   x.o1.ov1?.someProp or 32
+   `)).toBe(32);
+
+  expect(e.eval("x={}\nx?.p1?.ff")).toBe(null);
+});
+
+it('simple for', () => {
+  const script = `
+    sum = 0
+    for item in [1,2,3]:
+      sum = sum + item
+    sum
+      `;
+  expect(e.eval(script)).toBe(6);
+});
+
+it('simple while', () => {
+  const script = `
+    sum = 0
+    i = 0
+    
+    while i < 5:
+        sum = sum + i
+        i = i + 1
+
+    sum
+    `;
+  expect(e.eval(script)).toBe(10);
+});
+
+it('funcCall with null coalescing', () => {
+  const script = `
+    def f():
+      null
+
+    f()?.prop or 5
+    `
+    ;
+  expect(e.eval(script)).toBe(5);
+});
+
+it('long comments issue', () => {
+  const script = `
+    def f2():
+      """
+      long comment
+      """
+      5
+
+    f2()
+    `
+    ;
+  expect(e.eval(script)).toBe(5);
+});
+
+it('nude lambda', () => {
+  expect(e.eval("()=>null")).toBeInstanceOf(Function);
+});
+
+
+it('chaining funcCall with null coalescing', () => {
+  expect(e.eval("p={f: ()=>null}\np?.f()?.sdsd")).toBe(null);
+  expect(e.eval("p={f: ()=>null}\np?.f()?.sdsd or 5")).toBe(5);
+});
+
+it('comparison operations', () => {
+  expect(e.eval("1+2*3==7")).toBe(true);
+  expect(e.eval("1+2==2")).toBe(false);
+});
+
+it('comparison operations', () => {
+  expect(e.eval("1+2*3==7")).toBe(true);
+  expect(e.eval("1+2==2")).toBe(false);
+});
+
+// ** migration issue for now
+it('simple and operator', async () => {
+  expect(await e.evalAsync('2 == 2 and 3 == 3')).toBe(true)
+  expect(await e.evalAsync('(2 == 2) and (3 == 3) and (5 == 5)')).toBe(true)
+  expect(await e.evalAsync('(2 == 2) and (3 != 3) and (5 == 5)')).toBe(false)
+  expect(await e.evalAsync('(2 != 2) and (3 != 3) and (5 == 5)')).toBe(false)
+  expect(await e.evalAsync('(2 != 2) and (3 == 3) and (5 == 5)')).toBe(false)
+  expect(await e.evalAsync('(2 == 2) and (3 == 3) and (5 != 5)')).toBe(false)
+});
+
+it('simple or operator', async () => {
+  expect(await e.evalAsync('2 == 2 or 3 == 3')).toBe(true)
+  expect(await e.evalAsync('2 == 2 or 3 == 3 or 5 == 5')).toBe(true)
+  expect(await e.evalAsync('2 != 2 or 3 != 3 or 5 != 5')).toBe(false)
+  expect(await e.evalAsync('2 == 2 or 3 != 3 or 5 != 5')).toBe(true)
+  expect(await e.evalAsync('2 == 2 or 3 == 3 and 5 != 5')).toBe(true)
+});
+
+it("conditionals", async () => {
+  expect(await e.evalAsync('x = null\nx == null')).toBe(true)
+  expect(await e.evalAsync('x = null\nx?.p1?.p == null')).toBe(true)
+  expect(await e.evalAsync('x = null\nx != null and x.length >0')).toBe(false)
+  expect(await e.evalAsync('x = null\nx?.p1?.p != null and x.length >0')).toBe(false)
+});
+
+it('arithmetic + comparison', async () => {
+  expect(await e.evalAsync('0.25 == 1/4')).toBe(true)
+  expect(await e.evalAsync('0.25 == 1/2')).toBe(false)
+
+  expect(await e.evalAsync('1+2*3 == 5 or 1 > 3')).toBe(false)
+  expect(await e.evalAsync('1+2*3 == 5 or 1 < 3')).toBe(true)
+
+  expect(await e.evalAsync('2 == 1/2 + 1/2 and 1/2 + 1/2 == 1')).toBe(false)
+  expect(await e.evalAsync('(2 == 1/2 + 1/2) and (1/2 + 1/2 == 1)')).toBe(false)
+  expect(await e.evalAsync('(2 == (1/2 + 1/2)) and ((1/2 + 1/2) == 1)')).toBe(false)
+});
+
+it('Negative number', async () => {
+  expect(await e.evalAsync('-1')).toBe(-1)
+});
+
+it('number in parenthesis', async () => {
+  expect(await e.evalAsync('(1)')).toBe(1)
+});
+
+it('5+4*3**2', async () => {
+  expect(await e.evalAsync('5+4*3**2')).toBe(41)
+});
+
+it('5+4*3**2', async () => {
+  expect(e.eval('5+4*3**2')).toBe(41)
+});
+
+
+
+it('Negative numbers', async () => {
+  expect(await e.evalAsync('x=-1\nx')).toBe(-1)
+  expect(await e.evalAsync('x=-3.14 + 3\nx')).toBe(-3.14 + 3)
+  expect(await e.evalAsync('-3.14 - 3')).toBe(-3.14 - 3)
+  expect(await e.evalAsync('x=5\nx*-1')).toBe(-5)
+  expect(await e.evalAsync(`
+    def f(x):
+      return x
+    
+    f(-5)
+    `)).toBe(-5)
+
+  expect(await e.evalAsync(`
+    def f(x):
+      return x
+    
+    f(-0.14)
+    `)).toBe(-0.14)
+
+  expect(await e.evalAsync('1/2*-1 == -0.5')).toBe(true)
+
+});
+
+it('Recursive function - power', async () => {
+
+  const script =
+    `
+    def power(base, exponent):
+      if exponent == 0:
+        return 1
+      else:
+        return base * power(base, exponent - 1)
+    
+    "5 ** 10 == " + power(5, 10) + " == " + Math.pow(5, 10)    
+    `
+  expect(await e.evalAsync(script)).toBe('5 ** 10 == 9765625 == 9765625');
+});
+
+it('try catch error', async () => {
+  const script = `
+x = []
+try:
+  x.push("try")
+  raise RangeError("RangeError")
+except ReferenceError as e:
+  x.push("ReferenceError")
+except RangeError as e:
+  x.push("RangeError")
+except Error as e:
+  x.push("Error")
+else:
+  x.push("else")
+finally:
+  x.push("finally")
+x
+`;
+  expect(e.eval(script)).toEqual(["try", "RangeError", "finally"]);
+  expect(await e.evalAsync(script)).toEqual(["try", "RangeError", "finally"]);
+})
+
+it('try catch no error', async () => {
+  const script = `
+    x = []
+    try:
+      x.push(1)
+    except:
+      x.push(2)
+    finally:
+      x.push(3)
+    else:
+      x.push(4)
+    x
+    `;
+  const check = (result: number[]): void => {
+    expect(result.length).toBe(3);
+    expect(result[0]).toBe(1);
+    expect(result[1]).toBe(4);
+    expect(result[2]).toBe(3);
+  }
+
+  check(await e.evalAsync(script) as number[])
+  check(e.eval(script) as number[])
+})
+
+it('try catch errorMessage', async () => {
+  const script = `
+    m = ''
+    try:
+      raise Error('My Message')
+      x.push(1)
+    except Error as e:
+      m = e.message
+    m
+    `;
+
+  expect(await e.evalAsync(script)).toContain('My Message');
+  expect(e.eval(script)).toContain('My Message');
+})
+
+it('try catch errorMessage with alias', async () => {
+  const script = `
+    m = ''
+    try:
+      raise Error('My Message')
+      x.push(1)
+    except Error as err:
+      m = err.message
+    m
+    `;
+
+  expect(await e.evalAsync(script)).toContain('My Message');
+  expect(e.eval(script)).toContain('My Message');
+})
+
+it('try catch JS errorMessage', async () => {
+  const script = `
+    m = ''
+    try:
+      func1()
+    except Error as error:
+      m = error.message
+    m
+    `;
+  const obj = {
+    func1: () => {
+      throw new Error('JS Error Message');
+    }
+  };
+  expect(await e.evalAsync(script, obj)).toContain('JS Error Message');
+  expect(e.eval(script, obj)).toContain('JS Error Message');
+});
+
+it('if with AND', async () => {
+  const script = `
+      x=5
+      y=10
+      r = 0
+      
+      if x == 5 and y == 10:
+          r = x + y
+          
+      return r
+    `;
+
+  expect(await e.evalAsync(script)).toBe(15);
+  expect(e.eval(script)).toBe(15);
+}
+);
+
+it('if with AND nullable objects', async () => {
+  const script = `
+      l = null
+      r = {price: 5}
+      
+      if l?.price != null and r?.price != null:
+        return 100
+      
+      return 1
+    `;
+  expect(await e.evalAsync(script)).toBe(1);
+  expect(e.eval(script)).toBe(1);
+}
+);
+
+
+it('if with AND in brackets', async () => {
+  const script = `
+      x=5
+      y=10
+      r = 0
+      
+      if (x == 5) and (y == 10):
+          r = x + y
+          
+      return r
+      `
+  expect(await e.evalAsync(script)).toBe(15);
+  expect(e.eval(script)).toBe(15);
+}
+);
+
+// incorrect
+it('passing value type to the arrow function', async () => {
+
+  const script = `
+      x = [2,3,4,5,6,7,8,9]
+
+      sum = 0
+      x.forEach(i => sum = sum + i)
+      
+      sum
+      `
+}
+);
+
+it('passing value type to the for loop', async () => {
+
+  const script = `
+    x = [2,3,4,5,6,7,8,9]
+    sum = 0
+
+    for i in x:
+        sum = sum + i
+
+    sum
+      `
+  expect(await e.evalAsync(script)).toBe(44);
+  expect(e.eval(script)).toBe(44);
+}
+);
+
+it('passing value type to the while loop', async () => {
+
+  const script = `
+    x = [2,3,4,5,6,7,8,9]
+    sum = 0
+    i=0
+    while i < x.length:
+      val = x[i]
+      sum = sum + val
+      i = i + 1
+
+    sum
+      `
+  expect(await e.evalAsync(script)).toBe(44);
+  expect(e.eval(script)).toBe(44);
+}
+);
+
+it('passing value type to the arrow function', async () => {
+
+  const script = `
+    x = [2,3,4,5,6,7,8,9]
+
+    sum = {value:0}
+    x.forEach(i => sum.value = sum.value + i)
+    
+    sum.value
+    `
+  expect(await e.evalAsync(script)).toBe(44);
+  expect(e.eval(script)).toBe(44);
+}
+);
+
+
+it('unknown property is null', async () => {
+  const script = `
+    x = {}
+
+    if x.someValue == null:
+      return true
+    else:
+      return false
+    `
+  expect(await e.evalAsync(script)).toBe(true);
+  expect(e.eval(script)).toBe(true);
+}
+);
+
+it('boolean value', async () => {
+  const script = `
+    x = 2 == 2
+
+    if x:
+      return true
+    else:
+      return false
+    `
+  expect(await e.evalAsync(script)).toBe(true);
+  expect(e.eval(script)).toBe(true);
+}
+);
+
+it('null coalescing functions', async () => {
+  const script = `
+    o = {}
+
+    if o?.nonExistentFunctions(23, 43) == null:
+      return 10
+
+    return 5
+    `
+  expect(await e.evalAsync(script)).toBe(10);
+  expect(e.eval(script)).toBe(10);
+}
+);
+
+it('return empty', async () => {
+  const script = `
+    if 1 == 1:
+      return
+
+    return 5
+    `
+  expect(await e.evalAsync(script)).toBe(null);
+  expect(e.eval(script)).toBe(null);
+});
+
+it('semicolon as a string', async () => {
+  const interpreter = Mu();
+  const res = await interpreter.evalAsync(`"first;second".split(';')`) as string;
+  expect(res.length).toBe(2);
+});
+
+
+it('literal strings as keyword confusion', async () => {
+  const interpreter = Mu();
+
+  const script = `
+    s = '('
+    if s == '(':
+        return 55
+  
+    return 99
+    `;
+  expect(await interpreter.evalAsync(script)).toBe(55);
+  expect(interpreter.eval(script)).toBe(55);
+});
+
+
+it('literal strings as keyword confusion 2', async () => {
+  const interpreter = Mu();
+
+  const script = `
+    s = '()'
+    if s[0] == '(' and s[s.length - 1] == ')':
+        return 55
+  
+    return 99
+    `;
+  //expect(await interpreter.evalAsync(script)).toBe(55);
+  expect(interpreter.eval(script)).toBe(55);
+});
+
+
+it('Recursive factorial', async () => {
+
+  const script =
+    `
+    def fact(x):
+      if x == 1:
+        return 1
+      else:
+        return x * fact(x - 1)
+    
+    fact(5)
+    `
+  expect(await e.evalAsync(script)).toBe(120);
+});
+
+
+it('arrow functions1', () => {
+  const script = `
+x = n => {
+      t1: n*1,
+      t2: n*2
+}
+x(10)`;
+  expect(e.eval(script)).toEqual({ t1: 10, t2: 20 });
+});
+
+
+it('arrow functions3', () => {
+  const script = `
+    arr = [1,2,3]
+    arr.map(n =>
+            n = n * 2
+            return {
+                t1: n * 2,
+                t2: n * 3
+            }).map(r => r.t1 * 8).join(',')     
+      `;
+  expect(e.eval(script)).toBe("32,64,96");
+});
+
+
+it('functions preserve global context', async () => {
+  await e.evalAsync(`
+  x = 1
+  def fn():
+    x = 101
+    print("in fn x is " + x)
+  fn()
+  print("outside x is " + x)
+  `);
+  expect(lastPrint).toBe("outside x is 1");
+});
+
+it('functions can see global context', async () => {
+  await e.evalAsync(`
+  y = 1
+  def fn():
+    print("in fn y is " + y)
+  fn()
+  `);
+  expect(lastPrint).toBe("in fn y is 1");
+});
+
+
+it('infinite loop2', async () => {
+  expect(await e.evalAsync(`
+    def myRange(n):
+      print("in my range "+n)
+      x = []
+      i = 0
+      while i < n:
+        i = i + 1
+        if i%2 == 0 : continue
+        x.push(i)
+      x
+    y = []
+    for i in myRange(10):
+      y.push(i)
+    y.join(",")
+  `)).toBe('1,3,5,7,9')
+})
+
+
+it('while break / continue2', async () => {
+  expect(await e.evalAsync(`
+    i = 1
+    x = []
+    while i < 10:
+      i = i + 1
+      if i%2 == 0 : continue
+      print("pushing " + i)
+      x.push(i)
+    x.join(",")
+    `)).toBe('3,5,7,9')
+});
+
+
+it('for1', async () => {
+  expect(await e.evalAsync(`
+    x = []
+    x.push(1)
+    x.push(2)
+    x
+  `)).toEqual([1, 2])
+})
+it('for2', async () => {
+  await e.evalAsync(`
+    for i in [1,2,3]:
+      print(1)
+      break
+    print(2)
+  `);
+  expect(lastPrint).toEqual(2)
+})
+
+describe("Blocks", () => {
+  it('regular block', async () => {
+    await e.evalAsync(`
+  if true:
+     print("regular block")
+  `);
+    expect(lastPrint).toBe("regular block");
+  });
+
+  it('inline block', async () => {
+    await e.evalAsync(`if true: print("inline block")`);
+    expect(lastPrint).toBe("inline block");
+  });
+
+  it('after regular block', async () => {
+    await e.evalAsync(`
+  if true:
+     print("regular block")
+  print("after regular block")`);
+    expect(lastPrint).toBe("after regular block");
+  });
+
+
+  it('after inline block', async () => {
+    await e.evalAsync(`
+    if true: print("inline block")
+    print("after inline block")
+  `);
+    expect(lastPrint).toBe("after inline block");
+  });
+
+});
+
+describe("Booleans", () => {
+  describe("Boolean literals", () => {
+    it(...testEval("true", true));
+    it(...testEval("false", false));
+  });
+  describe("Boolean operators", () => {
+    it(...testEval("not true", false));
+    it(...testEval("not false", true));
+
+    it(...testEval("false and false", false));
+    it(...testEval("false and true", false));
+    it(...testEval("true and false", false));
+    it(...testEval("true and true", true));
+
+    it(...testEval("false or false", false));
+    it(...testEval("false or true", true));
+    it(...testEval("true or false", true));
+    it(...testEval("true or true", true));
+  });
+});
+describe("Numbers", () => {
+  describe("number comparators", () => {
+    it(...testEval("1>=0", true));
+    it(...testEval("1>0", true));
+    it(...testEval("1>=1", true));
+    it(...testEval("1>1", false));
+    it(...testEval("1>2", false));
+
+    it(...testEval("1<0", false));
+    it(...testEval("1<=0", false));
+    it(...testEval("1<1", false));
+    it(...testEval("1<=1", true));
+    it(...testEval("1<2", true));
+
+
+    it(...testEval("1==1", true));
+    it(...testEval("1==2", false));
+
+    it(...testEval("1!=1", false));
+    it(...testEval("1!=2", true));
+  });
+  describe("Number operators", () => {
+    it(...testEval("1+2", 3.0));
+    it(...testEval("5-4", 1.0));
+    it(...testEval("2*3", 6));
+    it(...testEval("9/3", 3));
+    it(...testEval("-5--15", 10));
+    it(...testEval("2**3", 8));
+  });
+  describe("Operator precedence", () => {
+    it(...testEval("1+2*3", 7.0));
+    it(...testEval("(1+2)*3", 9.0));
+    it(...testEval("3*2+1", 7));
+    it(...testEval("3*(1+2)", 9));
+    it(...testEval("5+4*3**2", 41));
+    it(...testEval("2*(3+4)+5", 19));
+  });
+});
+
+describe("Strings", () => {
+  describe("literals", () => {
+    it(...testEval('"a"', "a"));
+    it(...testEval('"a"', "a"));
+    it(...testEval('"""a"""', "a"));
+  });
+  describe("string comparators", () => {
+    it(...testEval('"b"+"a"', "ba"));
+    it(...testEval('"b"+5', "b5"));
+    it(...testEval('5+"b"', "5b"));
+    it(...testEval('5+5+"b"+5+5', "10b55"));
+  });
+
+});
+
+describe("null", () => {
+  it('null => null', () => expect(e.eval("null")).toBe(null));
+});
+
+describe("JSON", () => {
+  it(...testEval(`[1,2,3+4]`, [1, 2, 7], " JSON Array"));
+  it(...testEval(`{a:1, b:2}`, { a: 1, b: 2 }, " JSON Object"));
+  it(...testEval(`{"a":true, "b":null}`, { a: true, b: null }, " JSON Object with quoted names"));
+  it(...testEval(`{"a":true, b:[1,2,null]}`, { a: true, b: [1, 2, null] }, " Mixed JSON"));
+})
+
+describe("Assignments", () => {
+  it('o=1234', () => {
+    e.eval("o=1234");
+    expect(e.lastScope?.o).toBe(1234);
+  });
+
+})
+
+describe("Object members", () => {
+  it('o.sub1', () => {
+    const globals = { o: { v1: 55 } };
+    expect(e.eval("o.v1", globals)).toBe(55)
+  });
+  it('o.sub1.subValue', () => {
+    const globals = { o: { v1: 55, sub1: { sub2: 45 } } };
+    expect(e.eval("o.v1 + o.sub1.sub2", globals)).toBe(100)
+    expect(e.eval("o.v1 + o['sub1'].sub2", globals)).toBe(100)
+  });
+
+  it(`o["subValue"]`, () => {
+    const globals = { o: { subValue: 45 } };
+    expect(e.eval(`o["subValue"]`, globals)).toBe(45)
+  });
+
+  it('assignment o.sub1.subValue', () => {
+    e.eval("o.s=1", { o: {} })
+    expect(e.lastScope?.o).toEqual({ s: 1 });
+  });
+
+})
+
+describe("Loops", () => {
+  it('simple while', () => {
+    const script = [
+      "sum = 0",            // 1
+      "i = 0",              // 2
+      "",                   // 3
+      "while i < 5:",       // 4
+      "    sum = sum + i",  // 5
+      "    i = i + 1",      // 6
+      "",                   // 7
+      "sum"];               // 8
+
+    // 1+2+3+4 = 10
+    expect(e.eval(script.join("\n"))).toBe(10);
+  });
+
+  it('while with break', () => {
+    const script = [
+      "i = 0",              // 2
+      "while i < 15:",      // 4
+      "    i = i + 1",      // 6
+      "    if i == 3:",     // 7
+      "       break",       // 8
+      "",                   // 9
+      "i"];               // 10
+
+    // 1+2+3+4 = 10
+    expect(e.eval(script.join("\n"))).toBe(3);
+  });
+
+})
+
+
+describe("Functions", () => {
+
+  it('system global function call', () => {
+    const globals = { add: (x: number, y: number) => x + y };
+
+    expect(e.eval("add(2, 3)", globals)).toBe(5)
+  });
+
+
+  it('system object member function call', () => {
+    const globals = { o: { add: (x: number, y: number) => x + y } };
+
+    expect(e.eval("o.add(2, 3)", globals)).toBe(5)
+  });
+
+});
+
+
+it('Negative number', async () => {
+  expect(await e.evalAsync('-1')).toBe(-1)
+});
+
+it('number in parenthesis', async () => {
+  expect(await e.evalAsync('(1)')).toBe(1)
+});
+
+
+it("in", async () => {
+  expect(await e.evalAsync(`1 in [1,2]`)).toBe(true)
+})
+
+
+it('for in very large range', async () => {
+  await e.evalAsync([
+    "for i in range(10_000):",
+    "   print(i)",
+    "   if i==10:",
+    "      break"
+  ].join("\n"));
+  expect(lastPrint).toEqual(10)
+})
+
+it('if condition', () => {
+  const script = (p: number) => `
+  x = 1
+  if x == 1:
+    x = 5
+  else:
+    x = 10
+  x
+`;
+  expect(e.eval(script(1))).toBe(5);
+});
+
+it("tuple", () => {
+  expect(e!.eval(`1,2,3`)).toEqual([1, 2, 3]);
+});
+it('tuple in parenthesis', () => {
+  expect(e!.eval(`(1,2,3)`)).toEqual([1, 2, 3]);
+});
+
+
+it('use arrow functions', () => {
+  expect(e!.eval(`
+  fn = a => a * 2
+  fn(10)`)).toBe(20);
+});
+
+
+
+it('Mapping an array', () => {
+  const e = Mu();
+  const res = e.eval('([1,2,3]).map(x => 2 * x)');
+  expect(res).toEqual([2, 4, 6]);
+});
+
+
+describe("import", () => {
+
+
+  it("Import js", async () => {
+    const interpreter = Mu();
+    interpreter.importRoot = __dirname;
+
+    const res = await interpreter.evalAsync(`
+    import "math.js" as obj
+    return obj.PI
+    `);
+    expect(res).toBe(Math.PI);
+  });
+
+
+  it("Import Mu", async () => {
+    const interpreter = Mu();
+    interpreter.importRoot = __dirname;
+
+    const res = await interpreter.evalAsync(`
+    import "math.mu" as obj
+    return obj.PI
+    `);
+    expect(res).toBe(Math.PI);
+  });
+
+
+
+  it("Import some more", async () => {
+    const interpreter = Mu();
+
+    interpreter.loadFile = path => {
+      return Promise.resolve(`
+        def multiply(x, y):
+            x * y
+
+        def func1(x, y):
+          multiply(x, y) + someNumber
+
+        someNumber = 55
+      `);
+    };
+
+    const res = await interpreter.evalAsync(`
+    import 'service.Mu' as obj
+
+    return obj.func1(2, 3) + obj.multiply(2, 3)
+    `);
+
+    expect(res).toBe(67);
+  });
+
+
+  it('Import JSON', async () => {
+    const interpreter = Mu();
+
+    interpreter.loadFile = path => {
+      return Promise.resolve(`
+        {"x": "test1", "n": 22}
+      `);
+    }
+
+    const res = await interpreter.evalAsync(`
+    import './some.json' as obj
+    return obj
+    `);
+
+    expect(res).toEqual({ "x": "test1", "n": 22 });
+  });
+
+  it('Import and calling function with default value', async () => {
+    const interpreter = Mu();
+
+    interpreter.loadFile = ((path => {
+      return Promise.resolve(`
+          def multiply(x, y):
+              x * y
+  
+          def func1(x, y):
+            # if y is null then 100 will be passed
+            multiply(x, y or 100) + someNumber
+  
+          someNumber = 55
+        `);
+    }));
+
+    const res = await interpreter.evalAsync(`
+      import './service.Mu' as obj
+  
+      return obj.func1(2) + obj.multiply(2, 3)
+      `);
+
+    expect(res).toBe(261);
+  });
+
+  it('Import with package loader', async () => {
+    const interpreter = Mu();
+  
+    interpreter.importJsModule = async (path) => {
+      return path === "service.js" ? {
+        add: (x: number, y: number) => x + y,
+        remove: (x: number, y: number) => x - y,
+        times: (x: number, y: number) => x * y,
+      } : null
+    }
+  
+    interpreter.loadFile = async (path) => {
+      return Promise.resolve(`
+          from "service.js" import add
+  
+          def multiply(x, y):
+              x * y
+  
+          def func1(x, y):
+            add(x, y) + someNumber
+  
+          someNumber = 55
+        `);
+    }
+  
+    const res = await interpreter.evalAsync(`
+      import '/service.Mu' as obj
+  
+      return obj.func1(2, 3)
+      `);
+  
+    expect(res).toBe(60);
+  
+  
+  });
+  
+});
+
+
+
 
 it('print("Hello")', async () => {
   const r = await e.evalAsync('print("Hello")');
@@ -1594,5 +2845,6 @@ it('Empty string bug', async () => {
 it('Empty string bug for function return', async () => {
   expect(await e.evalAsync(`"".trim().length`)).toBe(0);
 });
+
 
 

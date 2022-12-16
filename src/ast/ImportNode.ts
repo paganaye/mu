@@ -49,8 +49,8 @@ export class ImportNode extends AstNode {
             case ".Mu":
                 try {
                     const fileContent = await interpreter.loadFile(importNode.filepath);
-                    let newIntepreter = interpreter.clonedInstance();
-                    let interpreterResult = await newIntepreter.evalAsync(fileContent);
+                    const newIntepreter = interpreter.clonedInstance();
+                    const interpreterResult = await newIntepreter.evalAsync(fileContent);
                     moduleContent = newIntepreter.lastScope;
                     
                 } catch (error) {

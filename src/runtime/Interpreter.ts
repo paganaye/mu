@@ -43,7 +43,7 @@ export class Interpreter {
     private getAst(codeOrAst: string | AstBlock | string[]): { ast: AstBlock, moduleName: string } {
         let ast: AstBlock;
         let moduleName: string;
-        let defaultModuleName = 'main.Mu';
+        const defaultModuleName = 'main.Mu';
         if (codeOrAst instanceof AstBlock) {
             ast = codeOrAst;
             moduleName = ast.name || defaultModuleName;
@@ -58,7 +58,7 @@ export class Interpreter {
 
     eval(codeOrAst: string | AstBlock | string[],
         context: object = {},
-        entryFunctionName: string = ''): unknown {
+        entryFunctionName = ''): unknown {
 
         const { ast, moduleName } = this.getAst(codeOrAst);
         const evalGlobals = {
@@ -120,7 +120,7 @@ export class Interpreter {
     clonedInstance(): Interpreter {
         // this instance should not interfer too much with the original one.
         // we should perhaps deep copy the globals object though.
-        let result = new Interpreter(this.globals);
+        const result = new Interpreter(this.globals);
         result.importJsModule = this.importJsModule;
         result.loadFile = this.loadFile;
         return result;

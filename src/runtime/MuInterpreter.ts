@@ -54,21 +54,21 @@ export class MuInterpreter extends Interpreter {
 export function Mu(): MuInterpreter {
     return new MuInterpreter();
 }
-let spaces = " ".repeat(100)
+const spaces = " ".repeat(100)
 function pad(s: string, length: number): string {
-    let l = s.length;
+    const l = s.length;
     if (l < length) s = s + spaces.substring(0, length - l);
     return s;
 }
 function trim(s: string, length: number): string {
     s = s.trim();
-    let l = s.length;
+    const l = s.length;
     if (l < length) s = s + spaces.substring(0, length - l);
     if (l > length) s = s.substring(0, length - 3) + "...";
     return s;
 }
 function padLeft(s: string, length: number): string {
-    let l = s.length;
+    const l = s.length;
     if (l < length) s = spaces.substring(0, length - l) + s;
     return s;
 }

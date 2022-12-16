@@ -22,8 +22,6 @@
     "build": "npx rollup -c",
     "build:publish": "npx rollup -c && npm publish",
     "dev": "npx rollup --config rollup.config.dev.js --watch",
-    "lint": "npx eslint . --ext .ts",
-    "lint-fix": "eslint . --ext .ts --fix",
     "kill-node": "taskkill /im node.exe /f"
   },
   "repository": {

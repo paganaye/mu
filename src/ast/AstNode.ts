@@ -11,7 +11,7 @@ export interface AstNodeArgs {
 export abstract class AstNode {
     constructor(public readonly args: AstNodeArgs = {}) {
         if (args.loc) {
-            let { startLine, startColumn, endLine, endColumn } = args.loc;
+            const { startLine, startColumn, endLine, endColumn } = args.loc;
             args.loc = { startLine, startColumn, endLine, endColumn };
         } else args.loc = NoLoc;
     }
