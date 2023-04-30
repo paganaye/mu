@@ -1,5 +1,9 @@
 package com.ganaye.plugins
 
+import com.ganaye.mu.parsing.Context
+import com.ganaye.mu.parsing.SourceFile
+import com.ganaye.mu.parsing.html.HTMLAndScriptBuilder
+import com.ganaye.mu.parsing.html.HTMLExpr
 import io.ktor.http.*
 import io.ktor.server.routing.*
 import io.ktor.server.response.*
@@ -23,7 +27,8 @@ fun Application.configureRouting() {
                     val ext = file.extension.toUpperCasePreservingASCIIRules();
                     if (ext == "HTML") {
                         val content = file.readText(Charsets.UTF_8)
-                        call.respondText(content.replace("{muUser}", "Pascal"), ContentType.Text.Html)
+
+                        call.respondText(processHTML(path, content), ContentType.Text.Html)
                     } else if (ext == "JS" || ext == "MU") {
                         val content = file.readText(Charsets.UTF_8)
                         call.respondText(content.replace("{muUser}", "Pascal"), ContentType.Text.JavaScript)
@@ -33,5 +38,18 @@ fun Application.configureRouting() {
                 call.respondText("Error: " + e.message)
             }
         }
+    }
+}
+
+fun processHTML(path: String, source: String): String {
+    try {
+        HTMLExpr.idCounter = 0
+        val context = Context(SourceFile(path, source))
+        val ast = context.htmlParser.parseAll()
+        val output = HTMLAndScriptBuilder() //= StringBuilder()
+        ast.toHtml(output)
+        return output.toString()
+    } catch (e: Exception) {
+        return "<p>Error " + e.message + "</p>"
     }
 }

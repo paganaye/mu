@@ -2,7 +2,6 @@ package com.ganaye.mu
 
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
-import com.ganaye.mu.runtime.Runtime
 import org.junit.jupiter.api.Test
 
 import org.junit.jupiter.api.Assertions.*
@@ -13,7 +12,7 @@ class ScriptParserTest {
         var context = Context(SourceFile("/test", source))
         val ast = context.scriptParser.parseScript()
         val output = StringBuilder()
-        Runtime.toJs(ast, output, reactive)
+        ast.toJS(output, reactive)
         return output.toString()
     }
 
@@ -26,13 +25,13 @@ class ScriptParserTest {
 
     @Test
     fun parseVarEqual() {
-        assertEquals("let a=5.0;", toJSScript("let a=5;"))
-        assertEquals("const x=\"a\";", toJSScript("const x=\"a\";"))
+        assertEquals("let a=new Var(5.0);", toJSScript("let a=5;"))
+        assertEquals("const x=new Var(\"a\");", toJSScript("const x=\"a\";"))
     }
 
     @Test
     fun parseTwoVars() {
-        assertEquals("let a=1.0;let b=2.0;", toJSScript("let a=1; let b=2;"))
+        assertEquals("let a=new Var(1.0);let b=new Var(2.0);", toJSScript("let a=1; let b=2;"))
     }
 
     @Test
@@ -111,7 +110,7 @@ class ScriptParserTest {
     @Test
     fun parseLambda() {
         val src = "let l = (a,b,c) => a+b+c"
-        val exp = "let l=(a,b,c) => a+b+c;"
+        val exp = "let l=new Var((a,b,c) => a+b+c);"
         assertEquals(exp, toJSScript(src))
     }
 
@@ -144,7 +143,7 @@ class ScriptParserTest {
     }
 }"""
         val exp = """class App extends Mu.Component {
-function render() return <h1>Hello world!</h1>;}
+function render() return mu.elt("h1",null,"Hello world!");}
 """
         assertEquals(exp, toJSScript(src))
     }
@@ -152,7 +151,7 @@ function render() return <h1>Hello world!</h1>;}
     @Test
     fun ReactStyleRenderFunc() {
         val src = "render(<App />, document.body)"
-        val exp = "render(<App/>,document.body)"
+        val exp = "render(mu.elt(\"App\",null),document.body)"
         assertEquals(exp, toJSScript(src))
     }
 }

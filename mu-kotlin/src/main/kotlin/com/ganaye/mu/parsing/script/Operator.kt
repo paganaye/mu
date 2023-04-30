@@ -85,7 +85,8 @@ enum class Operator(
     comma               (",",          OperatorType.N_Ary,  2, nCalc = { a -> a[a.size-1] }   ), //  ,          Comma x , y
     semi_colon          (";",          OperatorType.Other,  1                                 ), //  ;          see (*1)
     open_curly_brackets ("{",          OperatorType.Other,  1                                 ), //  {
-    close_curly_brackets("}",          OperatorType.Other,  1                                 ); //  }
+    close_curly_brackets("}",          OperatorType.Other,  1                                 ), //  }
+    end_script_tag      (null,         OperatorType.Other,  1                                 ); // </script>
     // @formatter:on       
     /*
     *1 : Comma has more

@@ -11,7 +11,9 @@ class Tokenizer<Token : IToken>(val iTokenizer: ITokenizer<Token>) {
         return newToken
     }
 
-    fun consumeToken() {
+    fun clearToken() {
         this._curToken = null
     }
+
+
 }

@@ -5,16 +5,19 @@ import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.ParserException
 import com.ganaye.mu.parsing.UnexpectedToken
 
-class ExprParser(context: Context) : BaseParser<ScriptToken, Expr>(context, context.scriptTokenizer) {
+class ExprParser
+constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.scriptTokenizer) {
 
-    fun parseAttributeExpr(): Expr {
+    fun parseAttributeExpr(priority: Int): Expr {
         this.nextToken()
-        var result = parseExpr(Operator.gt.priority)
+        val result = parseExpr(priority)
         return result
     }
 
     fun parseHTMLExpr(): Expr {
-        TODO()
+        tokenizer.clearToken()
+        val result = parseExpr(Operator.close_curly_brackets.priority)
+        return result
     }
 
     fun parseExpr(priority: Int = Operator.priorityZero): Expr {
@@ -132,11 +135,11 @@ class ExprParser(context: Context) : BaseParser<ScriptToken, Expr>(context, cont
         when (curToken) {
 
             is ScriptToken.Identifier -> {
-                return consumeAndReturn(Expr.Identifier(curToken.identifier))
+                return clearTokenAndReturn(Expr.Identifier(curToken.identifier))
             }
 
             is ScriptToken.StringLiteral -> {
-                return consumeAndReturn(Expr.StringConst(curToken.value))
+                return clearTokenAndReturn(Expr.StringConst(curToken.value))
             }
 
             is ScriptToken.OpToken -> {
@@ -150,7 +153,7 @@ class ExprParser(context: Context) : BaseParser<ScriptToken, Expr>(context, cont
                 }
 
                 when (op) {
-                    Operator.unary_plus, Operator.unary_minus -> return consumeAndReturn(
+                    Operator.unary_plus, Operator.unary_minus -> return clearTokenAndReturn(
                         Expr.UnaryOp(curToken.operator, parseLeft())
                     )
 
@@ -159,7 +162,7 @@ class ExprParser(context: Context) : BaseParser<ScriptToken, Expr>(context, cont
                         this.fileReader.rewind(curToken.pos)
                         val elt = context.htmlParser.parseOne()
                         // and back
-                        tokenizer.consumeToken()
+                        tokenizer.clearToken()
                         return Expr.JsxElement(elt)
                     }
 
@@ -175,7 +178,7 @@ class ExprParser(context: Context) : BaseParser<ScriptToken, Expr>(context, cont
                         return result
                     }
 
-                    else -> return consumeAndReturn(
+                    else -> return clearTokenAndReturn(
                         return Expr.InvalidExpr(
                             "Unexpected left operator",
                             curToken
@@ -185,11 +188,11 @@ class ExprParser(context: Context) : BaseParser<ScriptToken, Expr>(context, cont
             }
 
             is ScriptToken.Number -> {
-                return consumeAndReturn(Expr.NumberConst(curToken.value))
+                return clearTokenAndReturn(Expr.NumberConst(curToken.value))
             }
 
             is ScriptToken.InvalidToken -> {
-                return consumeAndReturn(Expr.InvalidExpr("Invalid token", curToken))
+                return clearTokenAndReturn(Expr.InvalidExpr("Invalid token", curToken))
             }
 
             is ScriptToken.Eof -> {

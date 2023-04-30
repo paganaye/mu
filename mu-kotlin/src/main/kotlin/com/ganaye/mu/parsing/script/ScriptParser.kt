@@ -7,7 +7,8 @@ import com.ganaye.mu.parsing.script.Statement.AssignStatement
 import com.ganaye.mu.parsing.script.Statement.ReturnStatement as ReturnStatement1
 
 class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(context, context.scriptTokenizer) {
-    fun parseScript(): Statement {
+    fun parseScript(): Statement.ScriptBlock {
+        tokenizer.clearToken()
         return parseBlock(true)
     }
 
@@ -16,8 +17,9 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
         val lines = mutableListOf<Statement>()
 
         while (curToken !is ScriptToken.Eof) {
-            if (curTokenIs(Operator.close_curly_brackets)) break
-
+            if (this.curToken.operator == Operator.close_curly_brackets
+                || this.curToken.operator == Operator.end_script_tag
+            ) break
             val line = parseSingleLine()
             lines.add(line)
             curToken = this.curToken
@@ -26,16 +28,11 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
     }
 
     private fun skipSemiColon() {
-        if (curTokenIs(Operator.semi_colon)) nextToken()
-    }
-
-    private fun curTokenIs(op: Operator): Boolean {
-        val curToken = this.curToken
-        return (curToken is ScriptToken.OpToken && curToken.operator == op)
+        if (curToken.operator == Operator.semi_colon) nextToken()
     }
 
     private fun parseSingleLine(): Statement {
-        var curToken = this.curToken
+        val curToken = this.curToken
         try {
             when (curToken) {
                 is ScriptToken.Identifier -> {
@@ -44,7 +41,7 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
                 }
 
                 else -> {
-                    if (curTokenIs(Operator.semi_colon)) {
+                    if (this.curToken.operator == Operator.semi_colon) {
                         nextToken()
                         return Statement.ScriptBlock(emptyList())
                     } else return parseExprLine(curToken)
@@ -157,11 +154,11 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
                 is ScriptToken.Identifier -> {
                     result.add(curToken.identifier)
                     nextToken()
-                    if (curTokenIs(Operator.comma)) nextToken()
+                    if (this.curToken.operator == Operator.comma) nextToken()
                 }
 
                 else -> {
-                    if (curTokenIs(Operator.close_parenthesis)) {
+                    if (this.curToken.operator == Operator.close_parenthesis) {
                         nextToken()
                         return result
                     } else break;
@@ -203,7 +200,7 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
     }
 
     private fun expectOperator(op: Operator) {
-        if (curTokenIs(op)) {
+        if (curToken.operator == op) {
             nextToken()
         } else {
             throw UnexpectedToken(curToken, " but was expecting " + op)
@@ -286,7 +283,7 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
             val variableName = curToken.identifier
             var initialValue: Expr? = null
             curToken = nextToken()
-            if (curTokenIs(Operator.simple_assign)) {
+            if (this.curToken.operator == Operator.simple_assign) {
                 nextToken() // skip operator =
                 initialValue = parseExpr()
             }
@@ -297,10 +294,10 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
     }
 
     private fun parseSingleLineOrBlock(): Statement {
-        if (curTokenIs(Operator.open_curly_brackets)) {
+        if (curToken.operator == Operator.open_curly_brackets) {
             nextToken()
             val block = parseBlock(false)
-            if (curTokenIs(Operator.close_curly_brackets)) {
+            if (curToken.operator == Operator.close_curly_brackets) {
                 nextToken()
             }
             return block

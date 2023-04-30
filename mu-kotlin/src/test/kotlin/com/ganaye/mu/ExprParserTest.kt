@@ -2,7 +2,6 @@ package com.ganaye.mu
 
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
-import com.ganaye.mu.runtime.Runtime
 import org.junit.jupiter.api.Test
 
 import org.junit.jupiter.api.Assertions.*
@@ -12,7 +11,7 @@ class ExprParserTest {
         val context = Context(SourceFile("/test", source))
         val ast = context.exprParser.parseExpr()
         val output = StringBuilder()
-        Runtime.toJs(ast, output, reactive)
+        ast.toJS(output, reactive)
         return output.toString()
     }
 
@@ -54,7 +53,7 @@ class ExprParserTest {
     @Test
     fun parseJSXExpr() {
         val source = "<p>hello</p>"
-        assertEquals("<p>hello</p>", toJSExpr(source, false))
+        assertEquals("mu.elt(\"p\",null,\"hello\")", toJSExpr(source, false))
         assertEquals("""mu.elt("p",null,"hello")""", toJSExpr(source, true))
     }
 

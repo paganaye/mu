@@ -9,6 +9,7 @@ sealed class Expr {
     abstract val isConst: Boolean
     abstract val constValue: Any?
     open val isWritable: Boolean? = null
+    var isVar: Boolean = true
 
     class NumberConst(val value: Double) : Expr() {
         override val isConst: Boolean = true
@@ -56,7 +57,7 @@ sealed class Expr {
         }
 
         override fun toString(): String {
-            return "** ERROR : $message $token"
+            return "** ERROR : $message $token at ${token.pos}"
         }
     }
 

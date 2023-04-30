@@ -3,8 +3,8 @@ package com.ganaye.mu.parsing.html
 import com.ganaye.mu.parsing.*
 import com.ganaye.mu.parsing.script.Expr
 import com.ganaye.mu.parsing.script.Operator
+import com.ganaye.mu.parsing.script.Statement
 import io.ktor.util.*
-import kotlin.math.cbrt
 
 
 class HTMLParser(context: Context) :
@@ -18,7 +18,7 @@ class HTMLParser(context: Context) :
     fun parseOne(): HtmlNode {
         val curToken = this.curToken
         if (curToken is HTMLToken.StartTag) {
-            return parseHTMLElement(curToken.tagName)
+            return parseHTMLElementOrScript(curToken.tagName)
         } else return InvalidHTML("Internal Error, Expecting HTML Element", curToken)
     }
 
@@ -58,13 +58,18 @@ class HTMLParser(context: Context) :
         // we don't parse the next token here as we expect non-HTML content
         this.fileReader.skipSpacesAndNewLines()
         val expectClosingCurlyBracket: Boolean
+        val priority: Int
         if (this.fileReader.curChar == '{') {
             this.fileReader.nextChar()
             expectClosingCurlyBracket = true
-        } else expectClosingCurlyBracket = false
-
+            priority = Operator.close_curly_brackets.priority
+        } else {
+            expectClosingCurlyBracket = false
+            // we don't want to parse / because <a ref=""/>
+            priority = Operator.div.priority
+        }
         // we're switching parser here
-        val result = context.exprParser.parseAttributeExpr()
+        val result = context.exprParser.parseAttributeExpr(priority)
         // and back
         this.fileReader.rewind(context.exprParser.curToken.pos)
         if (expectClosingCurlyBracket) {
@@ -84,7 +89,7 @@ class HTMLParser(context: Context) :
                 is HTMLToken.ClosingTag -> break
 
                 is HTMLToken.StartTag -> {
-                    children.add(parseHTMLElement(curToken.tagName))
+                    children.add(parseHTMLElementOrScript(curToken.tagName))
                 }
 
                 is HTMLToken.StartExpr -> {
@@ -94,14 +99,14 @@ class HTMLParser(context: Context) :
 
                 else -> {
                     children.add(HTMLText(curToken.toString()))
-                    this.nextToken()
+                    this.tokenizer.clearToken()
                 }
             }
         }
         return children
     }
 
-    private fun parseHTMLElement(tagName: String): HtmlNode {
+    private fun parseHTMLElementOrScript(tagName: String): HtmlNode {
         val lTagName = tagName.toLowerCasePreservingASCIIRules()
         nextToken()
 
@@ -110,23 +115,33 @@ class HTMLParser(context: Context) :
         var children: List<HtmlNode>? = null
         when (curToken) {
             is HTMLToken.TagContent -> {
-                if (curToken.empty || HTMLElement.selfClosingTags.contains(lTagName) ) {
-                    tokenizer.consumeToken()
+                if (curToken.empty || HTMLElement.selfClosingTags.contains(lTagName)) {
+                    tokenizer.clearToken()
                 } else {
-                    tokenizer.consumeToken()
-                    children = parseFragments()
-                    curToken = this.curToken
-                    if (curToken is HTMLToken.ClosingTag && curToken.tagName.toLowerCasePreservingASCIIRules() == lTagName) {
-                        tokenizer.consumeToken()
-                        // we don't nexToken() just yet because we might be the last item pof the HTMLParser
+                    tokenizer.clearToken()
+                    if (lTagName == "script") {
+                        return HTMLScriptElement(attributes, parseScriptContent());
+                    } else {
+                        children = parseFragments()
+                        curToken = this.curToken
+                        if (curToken is HTMLToken.ClosingTag && curToken.tagName.toLowerCasePreservingASCIIRules() == lTagName) {
+                            tokenizer.clearToken()
+                            // we don't nexToken() just yet because we might be the last item pof the HTMLParser
+                        }
                     }
                 }
+                return HTMLElement(tagName, attributes, children)
             }
 
             else -> throw UnexpectedToken(curToken, "in tag ${tagName}. Expecting </${tagName}> or />")
         }
-        return HTMLElement(tagName, attributes, children)
     }
+
+    fun parseScriptContent(): Statement.ScriptBlock {
+        tokenizer.clearToken()
+        val result = this.context.scriptParser.parseScript()
+        return result
+    }
+
+
 }
-
-

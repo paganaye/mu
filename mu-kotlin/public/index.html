@@ -1,23 +1,18 @@
 <!DOCTYPE html>
 <html>
-
 <head>
     <meta charset="utf-8">
     <title>Untitled Document</title>
 </head>
 <body>
+<script src="mu.js"></script>
+<h1>HTML says hello {muUser}</h1>
+<button onclick={count+=1}>
+    Clicked {count} {count == 1 ? 'time' : 'times'}
+</button>
 <script lang="mu">
 let muUser = "Pascal";
 let count = 0;
-
-function handleClick() {
-    count += 1;
-}
 </script>
-<h1>HTML says hello {muUser}</h1>
-<button click="handleClick()">
-    Clicked {count} {count === 1 ? 'time' : 'times'}
-</button>
-<script src="mu.js"></script>
 </body>
 </html>

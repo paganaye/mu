@@ -2,14 +2,17 @@ package com.ganaye.mu
 
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
+import com.ganaye.mu.parsing.html.HTMLAndScriptBuilder
+import com.ganaye.mu.parsing.html.HTMLExpr.Companion.idCounter
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.Test
 
 class HTMLParserTest {
     fun testHTML(source: String, expected: String) {
+        idCounter = 0
         val context = Context(SourceFile("/test", source))
         val ast = context.htmlParser.parseAll()
-        val output = StringBuilder()
+        val output = HTMLAndScriptBuilder()
         ast.toHtml(output)
         val actual = output.toString()
         assertEquals(expected, actual)
@@ -32,10 +35,21 @@ class HTMLParserTest {
     }
 
     @Test
-    fun parseSimpleExpr() {
-        val source = """<p>Hello {userName}</p>""".trimIndent()
-        val expected = """mu.elt("p",null,"Hello {userName}")""".trimIndent()
+    fun parseSimpleElement() {
+        val source = "<p>Hello</p>"
+        val expected = """mu.elt("p",null,"Hello")"""
         testJS(source, expected)
+    }
+
+    @Test
+    fun parseSimpleExpr() {
+        val source = "Hello {userName}"
+        val expected = """Hello <span id="muElt1" />
+<script>
+mu.mount(muElt1,userName);
+</script>
+"""
+        testHTML(source, expected)
     }
 
     @Test
@@ -62,7 +76,7 @@ class HTMLParserTest {
     @Test
     fun parseButtonClick() {
         val source = """<button click={handleClick}>""".trimIndent()
-        val expected = """<button click=handleClick/>""".trimIndent()
+        val expected = """<button click="handleClick"/>""".trimIndent()
         testHTML(source, expected)
     }
 
@@ -76,20 +90,15 @@ class HTMLParserTest {
     <title>Untitled Document</title>
 </head>
 <body>
-<button click={handleClick}>
-    Clicked {count} {count === 1 ? 'time' : 'times'}
+<script src="mu.js"></script>
+<h1>HTML says hello {muUser}</h1>
+<button onclick={count+=1}>
+    Clicked {count} {count == 1 ? 'time' : 'times'}
 </button>
 <script lang="mu">
-muUser = "Pascal";
-console.log("MU says hello Pascal");
+let muUser = "Pascal";
 let count = 0;
-// it appears similar to svelte reactivity.
-function handleClick() {
-    count += 1;
-}
-
 </script>
-<h1>HTML says hello Pascal</h1>
 </body>
 </html>""".trimIndent()
 
@@ -101,23 +110,90 @@ function handleClick() {
     <title>Untitled Document</title>
 </head>
 <body>
-<button click=handleClick>
-    Clicked {count} {count === 1 ? 'time' : 'times'}
+<script  src="mu.js"></script>
+<h1>HTML says hello <span id="muElt1" /></h1>
+<button onclick="mu.plus_assign(count,1.0)">
+    Clicked <span id="muElt2" /> <span id="muElt3" />
 </button>
-<script lang="mu">
-muUser = "Pascal";
-console.log("MU says hello Pascal");
-let count = 0;
-// it appears similar to svelte reactivity.
-function handleClick() {
-    count += 1;
-}
-
+<script  lang="mu">
+let muUser=new Var("Pascal");let count=new Var(0.0);
 </script>
-<h1>HTML says hello Pascal</h1>
 </body>
+
+<script>
+mu.mount(muElt1,muUser);
+mu.mount(muElt2,count);
+mu.mount(muElt3,mu.ternary_cond(mu.equalequal(count,1.0),"time","times"));
+</script>
 </html>""".trimIndent()
         testHTML(source, expected)
     }
 
+
+    @Test
+    fun small_HTML() {
+        val source = """
+<script src="mu.js"></script>
+<h1>Hello {user}</h1>
+<script>
+user = "Pascal"
+</script>""".trimIndent()
+
+        val expectedHTML = """
+<script  src="mu.js"></script>
+<h1>Hello <span id="muElt1" /></h1>
+<script>
+mu.simple_assign(user,"Pascal")
+</script>
+<script>
+mu.mount(muElt1,user);
+</script>
+
+""".trimIndent()
+        testHTML(source, expectedHTML)
+    }
+
+    @Test
+    fun smaller_HTML() {
+        val source = "Hello {user}"
+        val expectedHTML = """Hello <span id="muElt1" />
+<script>
+mu.mount(muElt1,user);
+</script>
+
+""".trimIndent()
+        testHTML(source, expectedHTML)
+    }
+
+    @Test
+    fun openScriptTag() {
+        val src = "<script src=\"A\"></script>"
+        val exp = "<script  src=\"A\"></script>"
+        testHTML(src, exp)
+    }
+
+    @Test
+    fun emptyScriptTag() {
+        val src = "<script src=\"A\"/>"
+        val exp = "<script src=\"A\"></script>"
+        testHTML(src, exp)
+    }
+
+    @Test
+    fun buttonOnClick() {
+        val src = "<button onclick={count+=1}>"
+        val exp = "<button onclick=\"mu.plus_assign(count,1.0)\"/>"
+        testHTML(src, exp)
+    }
+
+    @Test
+    fun script_tag() {
+        val source = "<script>let a=1</script>"
+        val expectedHTML = """
+<script>
+let a=new Var(1.0);
+</script>
+""".trimIndent()
+        testHTML(source, expectedHTML)
+    }
 }

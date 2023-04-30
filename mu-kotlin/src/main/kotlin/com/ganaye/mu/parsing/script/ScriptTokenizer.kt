@@ -43,19 +43,15 @@ class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
         while (fileReader.curChar != EOF_CHAR) {
             if (fileReader.curChar == ' ' || fileReader.curChar == '\n' || fileReader.curChar == '\r' || fileReader.curChar == '\t') {
                 // ignore white spaces
-            } else if ((fileReader.curChar >= 'a' && fileReader.curChar <= 'z')
-                || (fileReader.curChar >= 'A' && fileReader.curChar <= 'Z')
-                || fileReader.curChar == '_'
-                || fileReader.curChar == '$'
-            ) {
+            } else if (fileReader.curChar.isVariableStartingChar()) {
                 return parseIdentifier()
             } else if (fileReader.curChar >= '0' && fileReader.curChar <= '9') {
                 return parseNumber()
             } else if (fileReader.curChar == '"' || fileReader.curChar == '\'') {
                 return parseQuotedString()
-            } else if (fileReader.curChar == '/' && fileReader.peekNextChar() == '*') {
+            } else if (fileReader.curChar == '/' && fileReader.peekChar() == '*') {
                 skipComment()
-            } else if (fileReader.curChar == '/' && fileReader.peekNextChar() == '/') {
+            } else if (fileReader.curChar == '/' && fileReader.peekChar() == '/') {
                 skipSingleLineComment()
             } else {
                 // everything else must be some sort of operator
@@ -66,17 +62,14 @@ class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
         return ScriptToken.Eof(fileReader.tokenPosFrom(fileReader.getPos()))
     }
 
+
     fun parseIdentifier(): ScriptToken {
         val start = fileReader.getPos()
         val identifier = StringBuilder()
         do {
             identifier.append(fileReader.curChar)
             fileReader.nextChar()
-        } while ((fileReader.curChar >= 'a' && fileReader.curChar <= 'z')
-            || (fileReader.curChar >= 'A' && fileReader.curChar <= 'Z')
-            || (fileReader.curChar >= '0' && fileReader.curChar <= '9')
-            || fileReader.curChar == '_' || fileReader.curChar == '$'
-        )
+        } while (fileReader.curChar.isVariableChar())
         return ScriptToken.Identifier(fileReader.tokenPosFrom(start), identifier.toString())
     }
 
@@ -88,7 +81,7 @@ class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
             fileReader.nextChar()
         } while (fileReader.curChar >= '0' && fileReader.curChar <= '9')
         if (fileReader.curChar == '.') {
-            val nextChar = fileReader.peekNextChar()
+            val nextChar = fileReader.peekChar()
             if (nextChar >= '0' && nextChar <= '9') {
                 do {
                     number.append(fileReader.curChar)
@@ -138,14 +131,31 @@ class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
                 fileReader.nextChar()
             }
         }
-        return ScriptToken.OpToken(fileReader.tokenPosFrom(start), operator!!)
+        if (operator == Operator.lt && this.fileReader.peekChar(0) == '/'
+            && this.fileReader.peekChar(1) == 's'
+            && this.fileReader.peekChar(2) == 'c'
+            && this.fileReader.peekChar(3) == 'r'
+            && this.fileReader.peekChar(4) == 'i'
+            && this.fileReader.peekChar(5) == 'p'
+            && this.fileReader.peekChar(6) == 't'
+            && !this.fileReader.peekChar(7).isVariableChar()
+        ) {
+            while (fileReader.curChar != EOF_CHAR) {
+                fileReader.nextChar()
+                if (fileReader.curChar == '>') {
+                    fileReader.nextChar();
+                    break;
+                }
+            }
+            return ScriptToken.OpToken(fileReader.tokenPosFrom(start), Operator.end_script_tag)
+        } else return ScriptToken.OpToken(fileReader.tokenPosFrom(start), operator!!)
     }
 
     fun skipComment() {
         fileReader.nextChar()
         fileReader.nextChar()
         while (fileReader.curChar != EOF_CHAR) {
-            if (fileReader.curChar == '*' && fileReader.peekNextChar() == '/') {
+            if (fileReader.curChar == '*' && fileReader.peekChar() == '/') {
                 fileReader.nextChar()
                 fileReader.nextChar()
                 break;
@@ -186,4 +196,22 @@ class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
         return ScriptToken.StringLiteral(fileReader.tokenPosFrom(start), content.toString())
     }
 
+    companion object {
+
+    }
+
+}
+
+
+fun Char.isVariableStartingChar(): Boolean {
+    return (this >= 'a' && this <= 'z')
+            || (this >= 'A' && this <= 'Z')
+            || this == '_' || this == '$'
+}
+
+fun Char.isVariableChar(): Boolean {
+    return (this >= 'a' && this <= 'z')
+            || (this >= 'A' && this <= 'Z')
+            || (this >= '0' && this <= '9')
+            || this == '_' || this == '$'
 }

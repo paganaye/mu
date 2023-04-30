@@ -2,6 +2,7 @@ package com.ganaye.mu.parsing.html
 
 import com.ganaye.mu.parsing.*
 import com.ganaye.mu.parsing.FileReader.Companion.EOF_CHAR
+import com.ganaye.mu.parsing.script.isVariableStartingChar
 
 sealed class HTMLToken : IToken {
 
@@ -15,7 +16,7 @@ sealed class HTMLToken : IToken {
     }
 
     class StartExpr(override val pos: TokenPos) : HTMLToken() {
-        override fun toString(): String = "\${}"
+        override fun toString(): String = "{"
     }
 
     class StartTag(override val pos: TokenPos, val tagName: String) : HTMLToken() {
@@ -74,7 +75,7 @@ class HTMLTokenizer(val fileReader: FileReader) : ITokenizer<HTMLToken> {
                 }
 
                 '/' -> {
-                    if (fileReader.peekNextChar() == '>') {
+                    if (fileReader.peekChar() == '>') {
                         fileReader.nextChar(); fileReader.nextChar()
                         this.inTag = false
                         return HTMLToken.TagContent(fileReader.tokenPosFrom(startPos), true)
@@ -119,14 +120,11 @@ class HTMLTokenizer(val fileReader: FileReader) : ITokenizer<HTMLToken> {
         val text = StringBuilder()
         val from = fileReader.getPos()
         while (fileReader.curChar != EOF_CHAR) {
-            if (fileReader.curChar == '$') {
+            if (fileReader.curChar == '{') {
                 if (text.length > 0) return HTMLToken.Text(fileReader.tokenPosFrom(from), text.toString())
-                else if (fileReader.peekNextChar() == '{') {
-                    fileReader.nextChar(); fileReader.nextChar()
+                else {
+                    fileReader.nextChar();
                     return HTMLToken.StartExpr(fileReader.tokenPosFrom(from))
-                } else {
-                    text.append("$")
-                    fileReader.nextChar()
                 }
             } else if (fileReader.curChar == '<') {
                 return if (text.length > 0) HTMLToken.Text(fileReader.tokenPosFrom(from), text.toString())
@@ -219,7 +217,7 @@ class HTMLTokenizer(val fileReader: FileReader) : ITokenizer<HTMLToken> {
         val tagName = StringBuilder()
         while (true) {
             val c = fileReader.curChar
-            if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || (c == '-') || (c == '_')) {
+            if (c.isTagChar()) {
                 tagName.append(c)
                 fileReader.nextChar()
             } else break
@@ -228,4 +226,17 @@ class HTMLTokenizer(val fileReader: FileReader) : ITokenizer<HTMLToken> {
     }
 
 
+}
+
+fun Char.isTagStartingChar(): Boolean {
+    return (this >= 'a' && this <= 'z')
+            || (this >= 'A' && this <= 'Z')
+            || this == '_' || this == '-'
+}
+
+fun Char.isTagChar(): Boolean {
+    return (this >= 'a' && this <= 'z')
+            || (this >= 'A' && this <= 'Z')
+            || (this >= '0' && this <= '9')
+            || this == '_' || this == '-'
 }

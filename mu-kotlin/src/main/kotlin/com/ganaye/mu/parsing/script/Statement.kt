@@ -28,7 +28,13 @@ sealed class Statement {
                 output.append("$prefix $variableName")
             } else {
                 output.append("$prefix $variableName=");
-                initialValue.toJS(output, reactive);
+                if (initialValue.isVar) {
+                    output.append("new Var(")
+                    initialValue.toJS(output, reactive);
+                    output.append(")")
+                } else {
+                    initialValue.toJS(output, reactive);
+                }
             }
             output.append(";")
         }
@@ -172,7 +178,7 @@ sealed class Statement {
         }
 
         override fun toString(): String {
-            return "** ERROR : $message $token"
+            return "** ERROR : $message $token at ${token.pos}"
         }
     }
 
