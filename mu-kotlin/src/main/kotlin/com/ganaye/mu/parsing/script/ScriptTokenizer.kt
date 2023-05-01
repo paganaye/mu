@@ -1,10 +1,7 @@
 package com.ganaye.mu.parsing.script
 
-import com.ganaye.mu.parsing.FileReader
+import com.ganaye.mu.parsing.*
 import com.ganaye.mu.parsing.FileReader.Companion.EOF_CHAR
-import com.ganaye.mu.parsing.IToken
-import com.ganaye.mu.parsing.ITokenizer
-import com.ganaye.mu.parsing.TokenPos
 
 sealed class ScriptToken : IToken {
     open val operator: Operator? = null // this is a shortcut as it is used all over the place
@@ -33,9 +30,9 @@ sealed class ScriptToken : IToken {
         override fun toString() = JSON.stringify(value)
     }
 
-    class InvalidToken(override val pos: TokenPos, val value: String, val message: String) : ScriptToken() {
-        override fun toString() = "InvalidToken ${value} ${message} "
-    }
+//    class InvalidToken(override val pos: TokenPos, val value: String, val message: String) : ScriptToken() {
+//        override fun toString() = "InvalidToken ${value} ${message} "
+//    }
 }
 
 class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
@@ -104,7 +101,7 @@ class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
         val stringValue = number.toString()
         val doubleValue = stringValue.toDoubleOrNull()
         if (doubleValue == null) {
-            return ScriptToken.InvalidToken(fileReader.tokenPosFrom(start), stringValue, "This is not a valid number")
+            throw ParserException("This is not a valid number", fileReader.tokenPosFrom(start))
         }
         return ScriptToken.Number(fileReader.tokenPosFrom(start), doubleValue)
     }
@@ -116,11 +113,7 @@ class ScriptTokenizer(val fileReader: FileReader) : ITokenizer<ScriptToken> {
         fileReader.nextChar()
         var operator = Operator.operators.getOrDefault(currentOperator.toString(), null)
         if (operator == null) {
-            return ScriptToken.InvalidToken(
-                fileReader.tokenPosFrom(start),
-                currentOperator.toString(),
-                "Invalid operator"
-            )
+            throw ParserException("Invalid operator", fileReader.tokenPosFrom(start))
         }
         while (true) {
             currentOperator.append(fileReader.curChar)

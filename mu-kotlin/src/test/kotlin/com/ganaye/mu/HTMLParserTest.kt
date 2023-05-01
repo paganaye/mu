@@ -44,7 +44,7 @@ class HTMLParserTest {
     @Test
     fun parseSimpleExpr() {
         val source = "Hello {userName}"
-        val expected = """Hello <span id="muElt1" />
+        val expected = """Hello <span id="muElt1">…</span>
 <script>
 mu.mount(muElt1,userName);
 </script>
@@ -111,9 +111,9 @@ let count = 0;
 </head>
 <body>
 <script  src="mu.js"></script>
-<h1>HTML says hello <span id="muElt1" /></h1>
+<h1>HTML says hello <span id="muElt1">…</span></h1>
 <button onclick="mu.plus_assign(count,1.0)">
-    Clicked <span id="muElt2" /> <span id="muElt3" />
+    Clicked <span id="muElt2">…</span> <span id="muElt3">…</span>
 </button>
 <script  lang="mu">
 let muUser=new Var("Pascal");let count=new Var(0.0);
@@ -141,7 +141,7 @@ user = "Pascal"
 
         val expectedHTML = """
 <script  src="mu.js"></script>
-<h1>Hello <span id="muElt1" /></h1>
+<h1>Hello <span id="muElt1">…</span></h1>
 <script>
 mu.simple_assign(user,"Pascal")
 </script>
@@ -156,7 +156,7 @@ mu.mount(muElt1,user);
     @Test
     fun smaller_HTML() {
         val source = "Hello {user}"
-        val expectedHTML = """Hello <span id="muElt1" />
+        val expectedHTML = """Hello <span id="muElt1">…</span>
 <script>
 mu.mount(muElt1,user);
 </script>

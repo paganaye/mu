@@ -121,13 +121,13 @@ constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.s
             } else if (curToken is ScriptToken.OpToken && curToken.operator == Operator.comma) {
                 nextToken()
             } else {
-                return Expr.InvalidExpr("", curToken)
+                throw UnexpectedToken(curToken,"Expecting a comma or a closing parenthesis")
             }
             val nextArg = parseExpr(priority = Operator.comma.priority)
             args.add(nextArg)
             curToken = this.curToken
         }
-        return Expr.InvalidExpr("Function call ends with a closing parenthesis : ')'", curToken)
+        throw UnexpectedToken(curToken,"Expecting a comma or a closing parenthesis")
     }
 
     private fun parseLeft(): Expr {
@@ -173,17 +173,13 @@ constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.s
                         if (curToken is ScriptToken.OpToken && curToken.operator == Operator.close_parenthesis) {
                             nextToken()
                         } else {
-                            return Expr.InvalidExpr("Expecting a closing parenthesis", curToken)
+                            throw UnexpectedToken(curToken,"Expecting a closing parenthesis")
                         }
                         return result
                     }
 
-                    else -> return clearTokenAndReturn(
-                        return Expr.InvalidExpr(
-                            "Unexpected left operator",
-                            curToken
-                        )
-                    )
+                    else -> throw UnexpectedToken(curToken, " at the start of the expression")
+
                 }
             }
 
@@ -191,12 +187,12 @@ constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.s
                 return clearTokenAndReturn(Expr.NumberConst(curToken.value))
             }
 
-            is ScriptToken.InvalidToken -> {
-                return clearTokenAndReturn(Expr.InvalidExpr("Invalid token", curToken))
-            }
+//            is ScriptToken.InvalidToken -> {
+//                return throw UnexpectedToken(curToken,)
+//            }
 
             is ScriptToken.Eof -> {
-                return Expr.InvalidExpr("EOF not expected", curToken)
+                throw UnexpectedToken(curToken,"EOF not expected. Expecting a comma or a closing parenthesis")
             }
         }
         throw NotImplementedError()

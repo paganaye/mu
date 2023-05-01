@@ -48,18 +48,18 @@ sealed class Expr {
         }
     }
 
-    class InvalidExpr
-    constructor(val message: String, val token: IToken) : Expr() {
-        override val isConst: Boolean = false
-        override val constValue: Any? = null
-        override fun toJS(output: StringBuilder, reactive: Boolean) {
-            output.append(this.toString())
-        }
-
-        override fun toString(): String {
-            return "** ERROR : $message $token at ${token.pos}"
-        }
-    }
+//    class InvalidExpr
+//    constructor(val message: String, val token: IToken) : Expr() {
+//        override val isConst: Boolean = false
+//        override val constValue: Any? = null
+//        override fun toJS(output: StringBuilder, reactive: Boolean) {
+//            output.append(this.toString())
+//        }
+//
+//        override fun toString(): String {
+//            return "** ERROR : $message $token at ${token.pos}"
+//        }
+//    }
 
     class UnaryOp(val op: Operator, val expr: Expr) : Expr() {
         override val isConst: Boolean = expr.isConst

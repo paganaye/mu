@@ -154,4 +154,9 @@ function render() return mu.elt("h1",null,"Hello world!");}
         val exp = "render(mu.elt(\"App\",null),document.body)"
         assertEquals(exp, toJSScript(src))
     }
+
+    @Test
+    fun parseArrayExpr() {
+        // assertEquals("let a = [1,2,3];", toJSScript("let a = [1,2,3];"))
+    }
 }
