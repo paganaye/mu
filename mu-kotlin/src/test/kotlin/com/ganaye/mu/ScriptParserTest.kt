@@ -157,6 +157,11 @@ function render() return mu.elt("h1",null,"Hello world!");}
 
     @Test
     fun parseArrayExpr() {
-        // assertEquals("let a = [1,2,3];", toJSScript("let a = [1,2,3];"))
+        assertEquals("let a=new Var(mu.array(1.0,2.0,3.0));", toJSScript("let a = [1,2,3];"))
+    }
+
+    @Test
+    fun parseObjectExpr() {
+        //assertEquals("let a=new Var(mu.object({a:1.0,b:true}));", toJSScript("let a = {a:1,b:true};"))
     }
 }

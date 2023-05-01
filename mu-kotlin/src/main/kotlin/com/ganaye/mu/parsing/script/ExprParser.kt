@@ -121,13 +121,13 @@ constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.s
             } else if (curToken is ScriptToken.OpToken && curToken.operator == Operator.comma) {
                 nextToken()
             } else {
-                throw UnexpectedToken(curToken,"Expecting a comma or a closing parenthesis")
+                throw UnexpectedToken(curToken, "Expecting a comma or a closing parenthesis")
             }
             val nextArg = parseExpr(priority = Operator.comma.priority)
             args.add(nextArg)
             curToken = this.curToken
         }
-        throw UnexpectedToken(curToken,"Expecting a comma or a closing parenthesis")
+        throw UnexpectedToken(curToken, "Expecting a comma or a closing parenthesis")
     }
 
     private fun parseLeft(): Expr {
@@ -173,9 +173,17 @@ constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.s
                         if (curToken is ScriptToken.OpToken && curToken.operator == Operator.close_parenthesis) {
                             nextToken()
                         } else {
-                            throw UnexpectedToken(curToken,"Expecting a closing parenthesis")
+                            throw UnexpectedToken(curToken, "Expecting a closing parenthesis")
                         }
                         return result
+                    }
+
+                    Operator.square_bracket -> {
+                        return parseJSONArray()
+                    }
+
+                    Operator.open_curly_brackets -> {
+                        return parseJSONObject()
                     }
 
                     else -> throw UnexpectedToken(curToken, " at the start of the expression")
@@ -192,10 +200,29 @@ constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.s
 //            }
 
             is ScriptToken.Eof -> {
-                throw UnexpectedToken(curToken,"EOF not expected. Expecting a comma or a closing parenthesis")
+                throw UnexpectedToken(curToken, "EOF not expected. Expecting a comma or a closing parenthesis")
             }
         }
         throw NotImplementedError()
     }
 
+    fun parseJSONArray(): Expr {
+        nextToken() // skip [
+        val entries = mutableListOf<Expr>()
+        while (curToken !is ScriptToken.Eof) {
+            entries.add(parseExpr(Operator.square_bracket.priority))
+            if (curToken.operator == Operator.close_square_bracket) {
+                nextToken()
+                return Expr.Array(entries)
+            }
+            if (curToken.operator == Operator.comma) {
+                nextToken()
+            } else throw UnexpectedToken(curToken, " in Array. Expecting a comma or closing the array with ].")
+        }
+        throw UnexpectedToken(curToken, " in Array.")
+    }
+
+    fun parseJSONObject(): Expr {
+        TODO()
+    }
 }

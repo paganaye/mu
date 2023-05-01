@@ -20,7 +20,8 @@ enum class Operator(
     open_parenthesis    ("(",          OperatorType.Other,  18                                ), //  (          Expression Grouping (100 + 50) * 3
     close_parenthesis   (")",          OperatorType.Other,  0                                 ), //  )
     dot                 (".",          OperatorType.Binary, 17                                ), //  .          Member Of person.name
-    square_brackets     ("[",          OperatorType.Other,  17                                ), //  []         Member Of person["name"]
+    square_bracket      ("[",          OperatorType.Other,  17                                ), //  []         Member Of person["name"]
+    close_square_bracket("]",          OperatorType.Other,  17                                 ), //  )
     optional_chaining   ("?.",         OperatorType.Other,  17                                ), //  ?.         Optional Chaining ES2020 x ?. y
     function_call       (null,         OperatorType.Func,   17                                ), //  ()         Function Call myFunction()
     new_with_args       ("new",        OperatorType.Other,  17                                ), //  new        new with Arguments new Date("June 5,2022")

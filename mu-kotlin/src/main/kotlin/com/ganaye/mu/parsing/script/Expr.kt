@@ -209,4 +209,29 @@ sealed class Expr {
 
     }
 
+    class Array
+    constructor(content: Iterable<Expr>) : Expr() {
+        val values = content.toMutableList()
+        override val isConst: Boolean = false
+        override val constValue: Any? = null
+
+        override fun toString(): String = "[" + values.map { it.toString() }.joinToString(",") + "]"
+
+        override fun toJS(output: StringBuilder, reactive: Boolean) {
+            if (isConst) {
+                output.append(JSON.stringify(constValue))
+            } else {
+                output.append("mu.array(")
+                values.forEachIndexed({ index, expr ->
+                    if (index > 0) output.append(",");
+                    expr.toJS(output, reactive)
+                })
+                output.append(")")
+            }
+        }
+
+        override val priority = Operator.square_bracket.priority
+    }
+
+
 }
