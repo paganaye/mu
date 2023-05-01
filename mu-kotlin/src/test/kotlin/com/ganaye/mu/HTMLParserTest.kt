@@ -1,5 +1,6 @@
 package com.ganaye.mu
 
+import com.ganaye.mu.emit.JSBuilder
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
 import com.ganaye.mu.parsing.html.HTMLAndScriptBuilder
@@ -21,7 +22,7 @@ class HTMLParserTest {
     fun testJS(source: String, expected: String) {
         val context = Context(SourceFile("/test", source))
         val ast = context.htmlParser.parseAll()
-        val output = StringBuilder()
+        val output = JSBuilder()
         ast.toJS(output, true)
         val actual = output.toString()
         assertEquals(expected, actual)

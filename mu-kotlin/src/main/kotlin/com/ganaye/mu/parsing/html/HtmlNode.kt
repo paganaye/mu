@@ -1,20 +1,15 @@
 package com.ganaye.mu.parsing.html
 
+import com.ganaye.mu.emit.HTMLBuilder
+import com.ganaye.mu.emit.JSBuilder
 import com.ganaye.mu.parsing.script.Expr
 import com.ganaye.mu.parsing.script.JSON
 import com.ganaye.mu.parsing.script.Statement
 import io.ktor.util.*
 
 class HTMLAndScriptBuilder {
-    val htmlBuilder = StringBuilder()
-    val jsBuilder = StringBuilder()
-    fun appendHTML(s: String) {
-        htmlBuilder.append(s)
-    }
-
-    fun appendJS(s: String) {
-        jsBuilder.append(s)
-    }
+    val htmlBuilder = HTMLBuilder()
+    val jsBuilder = JSBuilder()
 
     public override fun toString(): String {
         return toHTML()
@@ -35,10 +30,6 @@ class HTMLAndScriptBuilder {
             }
         } else return html
     }
-
-    fun toJS(): String {
-        return TODO()
-    }
 }
 
 sealed class HtmlNode {
@@ -49,7 +40,7 @@ sealed class HtmlNode {
     }
 
     abstract fun toHtml(output: HTMLAndScriptBuilder)
-    abstract fun toJS(output: StringBuilder, reactive: Boolean)
+    abstract fun toJS(output: JSBuilder, reactive: Boolean)
 
 }
 
@@ -61,7 +52,7 @@ class HTMLFragment(children: Iterable<HtmlNode>) : HtmlNode() {
         }
     }
 
-    override fun toJS(output: StringBuilder, reactive: Boolean) {
+    override fun toJS(output: JSBuilder, reactive: Boolean) {
         children.forEach {
             it.toJS(output, reactive)
         }
@@ -76,39 +67,39 @@ constructor(val tagName: String, attributes: Iterable<HTMLAttribute>, children: 
     val children = children?.toList()
     val attributes = attributes.toList()
     val lTagName: String;
-    val closingTag: ClosingTag
+    val tagType: TagType
 
-    enum class ClosingTag {
-        OpenOnly,
-        SelfClosingOnly,
-        AlwaysClose,
+    enum class TagType {
+        DocTypeDeclaration,
+        AlwaysSelfClose,
+        NeverSelfClose,
         Normal
     }
 
     init {
         lTagName = tagName.toLowerCasePreservingASCIIRules()
-        closingTag = if (selfClosingTags.contains(lTagName)) ClosingTag.SelfClosingOnly
-        else if (lTagName.startsWith('!')) ClosingTag.OpenOnly
-        else if (lTagName == "script" || lTagName == "title") ClosingTag.AlwaysClose
-        else ClosingTag.Normal
+        tagType = if (selfClosingTags.contains(lTagName)) TagType.AlwaysSelfClose
+        else if (lTagName.startsWith('!')) TagType.DocTypeDeclaration
+        else if (lTagName == "script" || lTagName == "title") TagType.NeverSelfClose
+        else TagType.Normal
     }
 
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.appendHTML("<${tagName}")
+        output.htmlBuilder.startTag(tagName)
         attributes.forEach {
-            output.appendHTML(" ")
+            output.htmlBuilder.append(" ")
             it.toHtml(output)
         }
         val withClosingTag: Boolean
         val selfClosing: Boolean
-        when (closingTag) {
-            ClosingTag.OpenOnly -> {
+        when (tagType) {
+            TagType.DocTypeDeclaration -> {
                 selfClosing = false
                 withClosingTag = false
             }
 
             else -> {
-                if (closingTag == ClosingTag.AlwaysClose || (children != null && children.isNotEmpty())) {
+                if (tagType == TagType.NeverSelfClose || (children != null && children.isNotEmpty())) {
                     selfClosing = false
                     withClosingTag = true
                 } else {
@@ -117,12 +108,18 @@ constructor(val tagName: String, attributes: Iterable<HTMLAttribute>, children: 
                 }
             }
         }
-        if (selfClosing) output.appendHTML("/>") else output.appendHTML(">")
+        if (selfClosing) {
+            output.htmlBuilder.selfClose(tagType == TagType.DocTypeDeclaration)
+        } else {
+            output.htmlBuilder.enterTag()
+        }
         children?.forEach { it.toHtml(output) }
-        if (withClosingTag) output.appendHTML("</${tagName}>")
+        if (withClosingTag) {
+            output.htmlBuilder.closeTag(tagName)
+        }
     }
 
-    override fun toJS(output: StringBuilder, reactive: Boolean) {
+    override fun toJS(output: JSBuilder, reactive: Boolean) {
         //if (reactive) {
         output.append("mu.elt(\"$tagName\"")
         if (attributes.size > 0) {
@@ -175,25 +172,27 @@ constructor(attributes: Iterable<HTMLAttribute>, val content: Statement.ScriptBl
 
 
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.appendHTML("<script")
+        output.htmlBuilder.startTag("script")
         if (attributes.size > 0) {
-            output.appendHTML(" ")
+            output.htmlBuilder.append(" ")
             attributes.forEach {
-                output.appendHTML(" ")
+                output.htmlBuilder.append(" ")
                 it.toHtml(output)
             }
         }
         if (content.lines.size > 0) {
-            output.appendHTML(">\n")
-            content.toJS(output.htmlBuilder, true);
-            output.appendHTML("\n")
+            output.htmlBuilder.enterTag()
+            val jsBuilder = JSBuilder()
+            content.toJS(jsBuilder, true);
+            output.htmlBuilder.appendRaw("\n" + jsBuilder.toString() + "\n")
         } else {
-            output.appendHTML(">")
+            output.htmlBuilder.enterTag()
         }
-        output.appendHTML("</script>")
+        output.htmlBuilder.closeTag("script")
+
     }
 
-    override fun toJS(output: StringBuilder, reactive: Boolean) {
+    override fun toJS(output: JSBuilder, reactive: Boolean) {
         TODO()
     }
 }
@@ -201,20 +200,22 @@ constructor(attributes: Iterable<HTMLAttribute>, val content: Statement.ScriptBl
 class HTMLAttribute(val attributeName: String, val attributeValue: Expr?) : HtmlNode() {
     override fun toHtml(output: HTMLAndScriptBuilder) {
 
-        output.appendHTML(attributeName)
+        output.htmlBuilder.append(attributeName)
         if (attributeValue != null) {
-            output.appendHTML("=")
+            output.htmlBuilder.append("=")
             if (attributeValue.isConst) {
-                output.appendHTML(JSON.stringify(attributeValue.constValue))
+                output.htmlBuilder.append(JSON.stringify(attributeValue.constValue))
             } else {
                 output.htmlBuilder.append("\"")
-                attributeValue.toJS(output.htmlBuilder, true);
+                val jsBuilder = JSBuilder()
+                attributeValue.toJS(jsBuilder, true);
+                output.htmlBuilder.append(jsBuilder.asSingleString())
                 output.htmlBuilder.append("\"")
             }
         }
     }
 
-    override fun toJS(output: StringBuilder, reactive: Boolean) {
+    override fun toJS(output: JSBuilder, reactive: Boolean) {
         if (attributeValue == null) output.append(attributeName)
         else {
             output.append("$attributeName : ")
@@ -226,13 +227,17 @@ class HTMLAttribute(val attributeName: String, val attributeValue: Expr?) : Html
 class HTMLExpr(val content: Expr) : HtmlNode() {
     val id = ++idCounter
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.appendHTML("""<span id="muElt${id}">…</span>""")
-        output.appendJS("mu.mount(muElt${id},");
+        output.htmlBuilder.startTag("span")
+        output.htmlBuilder.append(""" id="muElt${id}"""")
+        output.htmlBuilder.enterTag()
+        output.htmlBuilder.append("…")
+        output.htmlBuilder.closeTag("span")
+        output.jsBuilder.append("mu.mount(muElt${id},")
         content.toJS(output.jsBuilder, true);
-        output.appendJS(");\n")
+        output.jsBuilder.appendLine(");")
     }
 
-    override fun toJS(output: StringBuilder, reactive: Boolean) {
+    override fun toJS(output: JSBuilder, reactive: Boolean) {
         output.append("[TODO script...]")
     }
 
@@ -243,10 +248,10 @@ class HTMLExpr(val content: Expr) : HtmlNode() {
 
 class HTMLText(val content: String) : HtmlNode() {
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.appendHTML(content)
+        output.htmlBuilder.append(content)
     }
 
-    override fun toJS(output: StringBuilder, reactive: Boolean) {
+    override fun toJS(output: JSBuilder, reactive: Boolean) {
         output.append(JSON.stringify(content));
     }
 
@@ -254,10 +259,10 @@ class HTMLText(val content: String) : HtmlNode() {
 
 class InvalidHTML(val message: String, val token: HTMLToken) : HtmlNode() {
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.appendHTML("Invalid: " + message + " " + token)
+        output.htmlBuilder.append("Invalid: " + message + " " + token)
     }
 
-    override fun toJS(output: StringBuilder, reactive: Boolean) {
+    override fun toJS(output: JSBuilder, reactive: Boolean) {
         output.append("Invalid: " + JSON.stringify(message) + " " + token);
     }
 

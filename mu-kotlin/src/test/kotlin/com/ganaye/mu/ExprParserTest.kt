@@ -1,5 +1,6 @@
 package com.ganaye.mu
 
+import com.ganaye.mu.emit.JSBuilder
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
 import org.junit.jupiter.api.Test
@@ -10,7 +11,7 @@ class ExprParserTest {
     fun toJSExpr(source: String, reactive: Boolean = false): String {
         val context = Context(SourceFile("/test", source))
         val ast = context.exprParser.parseExpr()
-        val output = StringBuilder()
+        val output = JSBuilder()
         ast.toJS(output, reactive)
         return output.toString()
     }

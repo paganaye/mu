@@ -1,5 +1,6 @@
 package com.ganaye.mu
 
+import com.ganaye.mu.emit.JSBuilder
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
 import org.junit.jupiter.api.Test
@@ -11,7 +12,7 @@ class ScriptParserTest {
     fun toJSScript(source: String, reactive: Boolean = false): String {
         var context = Context(SourceFile("/test", source))
         val ast = context.scriptParser.parseScript()
-        val output = StringBuilder()
+        val output = JSBuilder()
         ast.toJS(output, reactive)
         return output.toString()
     }
@@ -82,7 +83,11 @@ class ScriptParserTest {
     @Test
     fun parseFunction() {
         val src = "function double(a,b) { return a + b; }"
-        val exp = "function double(a,b) return a+b;"
+        val exp = """
+function double(a,b) {
+return a+b;}
+
+""".trimIndent()
         assertEquals(exp, toJSScript(src))
     }
 
@@ -137,14 +142,19 @@ class ScriptParserTest {
 
     @Test
     fun ReactStyleClassApp() {
-        val src = """class App extends Mu.Component {
+        val src = """
+class App extends Mu.Component {
     render() {
         return <h1>Hello world!</h1>
     }
 }"""
-        val exp = """class App extends Mu.Component {
-function render() return mu.elt("h1",null,"Hello world!");}
-"""
+        val exp = """
+class App extends Mu.Component {
+  render() {
+  return mu.elt("h1",null,"Hello world!");}
+}
+
+""".trimIndent()
         assertEquals(exp, toJSScript(src))
     }
 
