@@ -10,7 +10,7 @@
 <a href="/">Back to main page</a>
 <h1>Mu ToDo list</h1>
 <ul>
-    <input type="text" value="input1" oninput={input1=value}>
+    <input type="text" value={input1} oninput={input1=value}>
     <button onclick={mu_push(todos,input1)}>Add</button>
     <ul id="list1"></ul>
     <p>input1: {input1} count: {count}</p>
@@ -21,7 +21,7 @@
     </ul>
 </ul>
 <script>
-    let input1 = "hi"
+    let input1 = "ooo"
     let count = 0
     let todos = ["A","B","C"];
 </script>

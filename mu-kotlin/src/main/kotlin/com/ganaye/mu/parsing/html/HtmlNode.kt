@@ -20,13 +20,13 @@ class HTMLAndScriptBuilder {
         var js = jsBuilder.toString().trim();
         if (js.isNotEmpty()) {
             val indexOfHtmlEnd = html.lastIndexOf("</html>")
+            val textToInsert = "\n<script>\n$js\n</script>\n"
             if (indexOfHtmlEnd < 0) {
-                return "$html\n<script>\n$js\n</script>\n"
+                return html + textToInsert
             } else {
-                return html.substring(
-                    0,
-                    indexOfHtmlEnd
-                ) + "\n<script>\n$js\n</script>\n" + html.substring(indexOfHtmlEnd);
+                return (html.substring(0, indexOfHtmlEnd)
+                        + textToInsert
+                        + html.substring(indexOfHtmlEnd))
             }
         } else return html
     }
@@ -184,10 +184,11 @@ constructor(attributes: Iterable<HTMLAttribute>, val content: Statement.ScriptBl
             output.htmlBuilder.enterTag()
             val jsBuilder = JSBuilder()
             content.toJS(jsBuilder, true);
-            output.htmlBuilder.appendRaw("\n" + jsBuilder.toString() + "\n")
+            output.htmlBuilder.appendRaw("\n" + jsBuilder.toString())
         } else {
             output.htmlBuilder.enterTag()
         }
+
         output.htmlBuilder.closeTag("script")
 
     }

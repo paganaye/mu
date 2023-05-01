@@ -52,27 +52,35 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
         }
     }
 
+    private fun parseForInitLine(): Statement {
+        var curToken = this.curToken
+        if (curToken is ScriptToken.Identifier) {
+            val decl = parseDeclaration()
+            return decl
+        } else throw UnexpectedToken(curToken, "Expected a variable name = something.")
+
+    }
+
+
+    private fun parseForAfterThought(): Statement {
+        return parseSingleLine()
+    }
+
     private fun parseIdentifierLine(identifierToken: ScriptToken.Identifier): Statement {
         return when (identifierToken.identifier) {
-            "const" -> {
-                nextToken();
-                return parseDeclaration(DeclarationType.Const)
+            "const", "let", "var" -> {
+                return parseDeclaration()
             }
 
             "for" -> parseFor()
             "function" -> parseFunction()
             "if" -> parseIf()
-            "let" -> {
-                nextToken();
-                return parseDeclaration(DeclarationType.Let)
-            }
+
 
             "return" -> parseReturn()
             "switch" -> parseSwitch()
             "try" -> parseTry()
-            "var" -> {
-                nextToken(); return parseDeclaration(DeclarationType.Var)
-            }
+
 
             "while" -> parseWhile()
             "class" -> parseClass()
@@ -135,11 +143,11 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
     private fun parseFor(): Statement {
         nextToken();
         expectOperator(Operator.open_parenthesis);
-        val initialization: Statement = parseSingleLine();
-        // expectOperator(ScriptOperator.semi_colon);
+        val initialization: Statement = parseForInitLine();
+        expectOperator(Operator.semi_colon);
         val condition: Expr = parseExpr();
         expectOperator(Operator.semi_colon);
-        val afterthought: Statement = parseSingleLine();
+        val afterthought: Statement = parseForAfterThought();
         expectOperator(Operator.close_parenthesis);
         val contentBlock: Statement = parseSingleLineOrBlock();
         return Statement.ForStatement(initialization, condition, afterthought, contentBlock)
@@ -277,8 +285,29 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
         TODO()
     }
 
-    private fun parseDeclaration(type: DeclarationType): Statement {
+    private fun parseDeclaration(): Statement {
+        val type: DeclarationType
         var curToken = this.curToken
+        when (curToken.identifier) {
+            "const" -> {
+                curToken = nextToken();
+                type = DeclarationType.Const;
+            }
+
+            "let" -> {
+                curToken = nextToken();
+                type = DeclarationType.Let;
+            }
+
+            "var" -> {
+                curToken = nextToken();
+                type = DeclarationType.Var;
+            }
+
+            else -> {
+                type = DeclarationType.NoDeclaration
+            }
+        }
         if (curToken is ScriptToken.Identifier) {
             val variableName = curToken.identifier
             var initialValue: Expr? = null

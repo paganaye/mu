@@ -43,7 +43,7 @@ sealed class Statement {
                     initialValue.toJS(output, reactive);
                 }
             }
-            output.append(";")
+            output.appendLine(";")
         }
     }
 
@@ -83,8 +83,7 @@ sealed class Statement {
             output.append(") ")
             thenBlock.toJS(output, reactive)
             if (elseBlock != null) {
-                if (thenBlock !is ScriptBlock) output.append(";")
-                output.append(" else ")
+                output.append("else ")
                 elseBlock.toJS(output, reactive)
             }
         }
@@ -98,12 +97,14 @@ sealed class Statement {
     ) :
         Statement() {
         override fun toJS(output: JSBuilder, reactive: Boolean) {
-            output.append("for (")
+            output.append("for(")
             initialization.toJS(output, reactive)
-            output.append("; ")
+            output.rewind("\n")
             condition.toJS(output, reactive)
-            output.append("; ")
+            output.append(";")
             afterthought.toJS(output, reactive)
+            output.rewind("\n")
+            output.rewind(";")
             output.append(") ")
             contentBlock.toJS(output, reactive)
         }
@@ -194,6 +195,7 @@ sealed class Statement {
     class VoidExprLine(val expr: Expr) : Statement() {
         override fun toJS(output: JSBuilder, reactive: Boolean) {
             expr.toJS(output, reactive)
+            output.appendLine(";");
         }
     }
 

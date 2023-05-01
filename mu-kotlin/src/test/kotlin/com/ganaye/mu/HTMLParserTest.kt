@@ -117,7 +117,8 @@ let count = 0;
     Clicked <span id="muElt2">…</span> <span id="muElt3">…</span>
 </button>
 <script  lang="mu">
-let muUser=new Var("Pascal");let count=new Var(0.0);
+let muUser=new Var("Pascal");
+let count=new Var(0.0);
 </script>
 </body>
 
@@ -144,7 +145,7 @@ user = "Pascal"
 <script  src="mu.js"></script>
 <h1>Hello <span id="muElt1">…</span></h1>
 <script>
-mu.simple_assign(user,"Pascal")
+mu.simple_assign(user,"Pascal");
 </script>
 <script>
 mu.mount(muElt1,user);
