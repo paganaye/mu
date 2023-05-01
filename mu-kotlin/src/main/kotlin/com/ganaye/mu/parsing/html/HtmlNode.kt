@@ -226,7 +226,7 @@ class HTMLAttribute(val attributeName: String, val attributeValue: Expr?) : Html
 class HTMLExpr(val content: Expr) : HtmlNode() {
     val id = ++idCounter
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.appendHTML("""<span id="muElt${id}" />""")
+        output.appendHTML("""<span id="muElt${id}">…</span>""")
         output.appendJS("mu.mount(muElt${id},");
         content.toJS(output.jsBuilder, true);
         output.appendJS(");\n")
