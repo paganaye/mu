@@ -15,18 +15,28 @@
   }
   setInterval(() => checkIfServerResponseChanged(window.location.href), 1000);
 })();
+
 class Expr {
   addListener(listener, init) {
     let listeners = this.listeners || (this.listeners = []);
     listeners.push(listener);
     if (init) listener.call();
   }
+
   getValue() {
     return this.value;
   }
+
+  invalidateValue() {
+    if (this.value === undefined) return false;
+    this.value = undefined;
+    return true;
+  }
+
   setValue(newValue) {
     if (newValue === undefined) newValue = null;
-    if (newValue === this.value) return;
+    let originalValue = this.value;
+    if (newValue === originalValue) return;
     this.value = newValue;
     this.listeners?.forEach((listener) => listener.call());
   }
@@ -47,21 +57,24 @@ class Func extends Expr {
     this.args = args;
     this.lambda = lambda;
     let onArgChanged = () => {
-      if (this.value !== undefined) {
-        this.value = undefined;
-        this.listeners?.forEach((listener) => listener.call());
+      // lamba is possibly expensive. We call it only as little as possible
+      if (this.invalidateValue()) {
+        setTimeout(() => this.calcValue());
       }
     };
     args.forEach(a => {
       if (a instanceof Expr) a.addListener(onArgChanged, true)
     });
   }
+
+  calcValue() {
+    let argValues = this.args.map(a => a.getValue ? a.getValue() : a);
+    let newValue = this.lambda.apply(null, argValues)
+    this.setValue(newValue ?? null);
+  }
+
   getValue() {
-    if (this.value === undefined) {
-      let argValues = this.args.map(a => a.getValue ? a.getValue() : a);
-      let newValue = this.lambda.apply(null, argValues)
-      this.value = newValue ?? null;
-    }
+    if (this.value === undefined) this.calcValue();
     return this.value;
   }
 }

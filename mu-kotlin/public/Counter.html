@@ -7,11 +7,13 @@
 </head>
 <body>
 <script src="mu.js"></script>
-<h1>Welcome to Mu</h1>
-<ul>
-    <li><a href="SimpleExpr.html">Simple Expression</a></li>
-    <li><a href="Counter.html">Counter</a></li>
-    <li><a href="ToDo.html">ToDo list</a></li>
-</ul>
+<a href="/">Back to main page</a>
+<h1>Mu Counter</h1>
+<button onclick={count+=1}>
+    Clicked {count} {count == 1 ? 'time' : 'times'}
+</button>
+<script lang="mu">
+let count = 0;
+</script>
 </body>
 </html>
