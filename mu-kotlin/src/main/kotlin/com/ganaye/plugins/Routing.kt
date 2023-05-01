@@ -5,14 +5,12 @@ import com.ganaye.mu.parsing.SourceFile
 import com.ganaye.mu.parsing.html.HTMLAndScriptBuilder
 import com.ganaye.mu.parsing.html.HTMLExpr
 import io.ktor.http.*
-import io.ktor.server.routing.*
-import io.ktor.server.response.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
-import io.ktor.server.routing.get
-import java.io.File
+import io.ktor.server.response.*
+import io.ktor.server.routing.*
 import io.ktor.util.*
-import java.awt.TrayIcon.MessageType
+import java.io.File
 
 
 fun Application.configureRouting() {

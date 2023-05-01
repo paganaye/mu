@@ -2,7 +2,6 @@ package com.ganaye.mu.parsing.html
 
 import com.ganaye.mu.parsing.*
 import com.ganaye.mu.parsing.FileReader.Companion.EOF_CHAR
-import com.ganaye.mu.parsing.script.isVariableStartingChar
 
 sealed class HTMLToken : IToken {
 

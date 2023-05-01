@@ -1,9 +1,9 @@
 package com.ganaye
 
+import com.ganaye.plugins.configureRouting
 import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
-import com.ganaye.plugins.*
 
 fun main() {
     System.setProperty("io.ktor.development", "true")

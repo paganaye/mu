@@ -1,7 +1,5 @@
 package com.ganaye.mu.parsing.script
 
-import java.lang.Exception
-
 enum class OperatorType {
     Prefix, Postfix, Binary, Lambda, Ternary, N_Ary, Func, Other,
 }

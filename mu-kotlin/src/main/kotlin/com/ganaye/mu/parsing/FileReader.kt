@@ -37,7 +37,7 @@ class FileReader(val file: ISourceFile) {
         return curChar
     }
 
-    fun peekChar(offset: Int =1): Char {
+    fun peekChar(offset: Int = 1): Char {
         return if (pos + offset >= length) EOF_CHAR else source[pos + offset]
     }
 

@@ -195,15 +195,9 @@ constructor(context: Context) : BaseParser<ScriptToken, Expr>(context, context.s
                 return clearTokenAndReturn(Expr.NumberConst(curToken.value))
             }
 
-//            is ScriptToken.InvalidToken -> {
-//                return throw UnexpectedToken(curToken,)
-//            }
-
-            is ScriptToken.Eof -> {
-                throw UnexpectedToken(curToken, "EOF not expected. Expecting a comma or a closing parenthesis")
-            }
+            else -> {}
         }
-        throw NotImplementedError()
+        throw UnexpectedToken(curToken, "expected expression")
     }
 
     fun parseJSONArray(): Expr {

@@ -81,9 +81,22 @@ class Func extends Expr {
 
 var mu = {
   plus_assign(variable, value) {
+    console.log("mu.plus_assign",{variable,value})
     variable.setValue(variable.getValue() + value);
   },
+  push(variable, value) {
+    console.log("mu.push",{variable,value})
+  },
+  simple_assign(variable,value) {
+    console.log("mu.simple_assign",{variable,value})
+    variable.setValue(value);
+  },
+  array(value) {
+    console.log("mu.array",{value})
+    return value;
+  },
   mount(elt, expr) {
+    console.log("mu.mount",{elt, expr})
     // first we replace the <span element>
     let text = expr.getValue();
     let newElt = document.createTextNode(text)
@@ -96,4 +109,8 @@ var mu = {
   // the functions below are reactive and called when their arguments change
   equalequal(a, b) { return new Func([a, b], (a, b) => a == b); },
   ternary_cond(a, b, c) { return new Func([a, b, c], (a, b, c) => a ? b : c); }
+}
+
+function mu_push(variable,value) {
+    console.log("mu_push", { variable, value });
 }
