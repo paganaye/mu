@@ -212,5 +212,48 @@ function renderElt1(it) {
         testHTML(src, exp)
     }
 
+    @Test
+    fun ifInIf() {
+        val src = "<p if={x}>x<span if={y}>= {y}</span></p>"
+        val exp = """
+<span id="muElt2">…</span>
+<script>
+mu.mountIf(x,renderElt2,muElt2)
+function renderElt2(it) {
+  return mu.elt("p",null,"x",mu.elt("span",null,"= ",mu.mount(y,muElt3);
+  ));
+}
+</script>"""
+        testHTML(src, exp)
+    }
+
+    @Test
+    fun ifElseIfAttribute() {
+        val src = """
+            |<p if={x}>X</p>
+            |<p elseif={y}>Y</p>
+            |<p else={z}>Z</p>
+        """.trimMargin()
+        val exp = """
+<span id="muElt1">…</span>
+<span id="muElt2">…</span>
+<span id="muElt3">…</span>
+<script>
+mu.mountIf(x,renderElt1,muElt1)
+function renderElt1(it) {
+  return mu.elt("p",null,"X");
+}
+function renderElt2(it) {
+  return mu.elt("p",null,"Y");
+}
+function renderElt3(it) {
+  return mu.elt("p",null,"Z");
+}
+</script>
+"""
+        testHTML(src, exp)
+    }
+
+
 
 }

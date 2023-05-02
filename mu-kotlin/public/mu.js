@@ -53,7 +53,6 @@ class Var extends Expr {
 
 class Func extends Expr {
   constructor(args, lambda) {
-    super();
     this.args = args;
     this.lambda = lambda;
     let onArgChanged = () => {

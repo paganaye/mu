@@ -305,14 +305,14 @@ class HTMLExpr(val content: Expr) : HtmlNode() {
 
     override fun toHtml(output: HTMLAndScriptBuilder) {
         renderPlaceHolder(output)
-        output.jsBuilder.append("mu.mount(")
-        content.toJS(output.jsBuilder, true);
-        output.jsBuilder.appendLine(",muElt${id});")
+        toJS(output.jsBuilder, true);
     }
 
 
     override fun toJS(output: JSBuilder, reactive: Boolean) {
-        output.append("[TODO script...]")
+        output.append("mu.mount(")
+        content.toJS(output, true);
+        output.appendLine(",muElt${id});")
     }
 }
 

@@ -3,11 +3,9 @@ package com.ganaye.mu.parsing.html
 import com.ganaye.mu.emit.JSBuilder
 import com.ganaye.mu.parsing.script.Expr
 
-sealed class TemplateCond() {
+sealed abstract class TemplateCond() {
 
-    open fun toJS(jsBuilder: JSBuilder) {
-        TODO()
-    }
+    abstract fun toJS(jsBuilder: JSBuilder)
 
     class IfCond(val ifCond: Expr, val eltId: Int) : TemplateCond() {
         override fun toJS(jsBuilder: JSBuilder) {
@@ -21,7 +19,15 @@ sealed class TemplateCond() {
         }
     }
 
-    class Else : TemplateCond() {}
-    class ElseIfCond(elseIfCont: Expr) : TemplateCond() {}
+    class Else : TemplateCond() {
+        override fun toJS(jsBuilder: JSBuilder) {
+            //TODO("Not yet implemented")
+        }
+    }
+    class ElseIfCond(elseIfCont: Expr) : TemplateCond() {
+        override fun toJS(jsBuilder: JSBuilder) {
+            //TODO("Not yet implemented")
+        }
+    }
 
 }
