@@ -3,7 +3,7 @@ package com.ganaye.plugins
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
 import com.ganaye.mu.parsing.html.HTMLAndScriptBuilder
-import com.ganaye.mu.parsing.html.HTMLExpr
+import com.ganaye.mu.parsing.html.HtmlNode.Companion.NodeIdCounter
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -41,7 +41,7 @@ fun Application.configureRouting() {
 
 fun processHTML(path: String, source: String): String {
     try {
-        HTMLExpr.idCounter = 0
+        NodeIdCounter = 0
         val context = Context(SourceFile(path, source))
         val ast = context.htmlParser.parseAll()
         val output = HTMLAndScriptBuilder() //= StringBuilder()

@@ -90,7 +90,7 @@ class ScriptParserTest {
         val src = "function double(a,b) { return a + b; }"
         val exp = """
 function double(a,b) {
-return a+b;}
+  return a+b;}
 
 """.trimIndent()
         testJS(src, exp)
@@ -156,7 +156,7 @@ class App extends Mu.Component {
         val exp = """
 class App extends Mu.Component {
   render() {
-  return mu.elt("h1",null,"Hello world!");}
+    return mu.elt("h1",null,"Hello world!");}
 }
 
 """.trimIndent()

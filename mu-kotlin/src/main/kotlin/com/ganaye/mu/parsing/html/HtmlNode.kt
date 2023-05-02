@@ -17,22 +17,28 @@ class HTMLAndScriptBuilder {
 
     fun toHTML(): String {
         val html = htmlBuilder.toString();
-        var js = jsBuilder.toString().trim();
-        if (js.isNotEmpty()) {
-            val indexOfHtmlEnd = html.lastIndexOf("</html>")
+        val js = jsBuilder.toString().trim();
+        return if (js.isNotEmpty()) {
             val textToInsert = "\n<script>\n$js\n</script>\n"
-            if (indexOfHtmlEnd < 0) {
-                return html + textToInsert
-            } else {
-                return (html.substring(0, indexOfHtmlEnd)
-                        + textToInsert
-                        + html.substring(indexOfHtmlEnd))
-            }
-        } else return html
+            val indexOfHtmlEnd = html.lastIndexOf("</html>")
+            if (indexOfHtmlEnd < 0) (html + textToInsert)
+            else (html.substring(0, indexOfHtmlEnd) + textToInsert + html.substring(indexOfHtmlEnd))
+        } else html
     }
 }
 
 sealed class HtmlNode {
+    open val id: Int
+        get() = 0
+
+    protected fun renderPlaceHolder(output: HTMLAndScriptBuilder, tagName: String = "span") {
+        output.htmlBuilder.startTag(tagName)
+        output.htmlBuilder.append(""" id="muElt${id}"""")
+        output.htmlBuilder.enterTag()
+        output.htmlBuilder.append("…")
+        output.htmlBuilder.closeTag(tagName)
+    }
+
     override fun toString(): String {
         val b = HTMLAndScriptBuilder()
         toHtml(b)
@@ -42,6 +48,9 @@ sealed class HtmlNode {
     abstract fun toHtml(output: HTMLAndScriptBuilder)
     abstract fun toJS(output: JSBuilder, reactive: Boolean)
 
+    companion object {
+        var NodeIdCounter = 0
+    }
 }
 
 class HTMLFragment(children: Iterable<HtmlNode>) : HtmlNode() {
@@ -60,20 +69,24 @@ class HTMLFragment(children: Iterable<HtmlNode>) : HtmlNode() {
 
 }
 
-
-class HTMLElement
-constructor(val tagName: String, attributes: Iterable<HTMLAttribute>, children: Iterable<HtmlNode>?) :
-    HtmlNode() {
+open class HTMLElement
+constructor(val tagName: String, attributes: Iterable<MuAttribute>, children: Iterable<HtmlNode>?) : HtmlNode() {
     val children = children?.toList()
-    val attributes = attributes.toList()
+    val attributes: List<HTMLAttribute>
     val lTagName: String;
     val tagType: TagType
+    val loop: TemplateLoop?
+    val cond: TemplateCond?
+
+    private var _id = 0
+    override val id: Int
+        get() {
+            if (_id == 0) _id = (++NodeIdCounter)
+            return _id
+        }
 
     enum class TagType {
-        DocTypeDeclaration,
-        AlwaysSelfClose,
-        NeverSelfClose,
-        Normal
+        DocTypeDeclaration, AlwaysSelfClose, NeverSelfClose, Normal
     }
 
     init {
@@ -82,40 +95,90 @@ constructor(val tagName: String, attributes: Iterable<HTMLAttribute>, children: 
         else if (lTagName.startsWith('!')) TagType.DocTypeDeclaration
         else if (lTagName == "script" || lTagName == "title") TagType.NeverSelfClose
         else TagType.Normal
+
+        var loop: TemplateLoop? = null
+        var cond: TemplateCond? = null
+        var hasIf = false
+        var hasElse = false
+        var hasElseIf = false
+        val htmlAttributes = mutableListOf<HTMLAttribute>()
+        attributes.forEach {
+            when (it.name) {
+                "if" -> cond = TemplateCond.IfCond(it.value!!, this.id)
+                "elseif", "else-if" -> cond = TemplateCond.ElseIfCond(it.value!!)
+                "else" -> cond = TemplateCond.Else()
+                "foreach" -> loop = TemplateLoop.ForEachLoop(varName = "it", iterator = Expr.Null)
+                "while" -> loop = TemplateLoop.WhileLoop(whileCond = Expr.Null)
+                else -> htmlAttributes.add(HTMLAttribute(this, it.name, it.value))
+            }
+        }
+        this.loop = loop
+        this.cond = cond
+
+        this.attributes = htmlAttributes.toList()
     }
 
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.htmlBuilder.startTag(tagName)
-        attributes.forEach {
-            output.htmlBuilder.append(" ")
-            it.toHtml(output)
+        var condValue = true
+        if (cond != null) {
+            condValue = false
+            cond.toJS(output.jsBuilder)
         }
-        val withClosingTag: Boolean
-        val selfClosing: Boolean
-        when (tagType) {
-            TagType.DocTypeDeclaration -> {
-                selfClosing = false
-                withClosingTag = false
-            }
-
-            else -> {
-                if (tagType == TagType.NeverSelfClose || (children != null && children.isNotEmpty())) {
-                    selfClosing = false
-                    withClosingTag = true
-                } else {
-                    selfClosing = true
-                    withClosingTag = false
+        if (condValue) {
+            var loopIndex = 0
+            while (true) {
+                val loopValue = loop?.eval(loopIndex) ?: (loopIndex == 0)
+                if (!loopValue) {
+                    if (loopIndex == 0) {
+                        renderPlaceHolder(output)
+                    }
+                    break
                 }
+                output.htmlBuilder.startTag(tagName)
+                attributes.forEach {
+                    output.htmlBuilder.append(" ")
+                    it.toHtml(output)
+                }
+                val withClosingTag: Boolean
+                val selfClosing: Boolean
+                when (tagType) {
+                    TagType.DocTypeDeclaration -> {
+                        selfClosing = false
+                        withClosingTag = false
+                    }
+
+                    else -> {
+                        if (tagType == TagType.NeverSelfClose || (children != null && children.isNotEmpty())) {
+                            selfClosing = false
+                            withClosingTag = true
+                        } else {
+                            selfClosing = true
+                            withClosingTag = false
+                        }
+                    }
+                }
+                if (selfClosing) {
+                    output.htmlBuilder.selfClose(tagType == TagType.DocTypeDeclaration)
+                } else {
+                    output.htmlBuilder.enterTag()
+                }
+                children?.forEach { it.toHtml(output) }
+                if (withClosingTag) {
+                    output.htmlBuilder.closeTag(tagName)
+                }
+                loopIndex += 1
             }
-        }
-        if (selfClosing) {
-            output.htmlBuilder.selfClose(tagType == TagType.DocTypeDeclaration)
         } else {
-            output.htmlBuilder.enterTag()
+            renderPlaceHolder(output)
         }
-        children?.forEach { it.toHtml(output) }
-        if (withClosingTag) {
-            output.htmlBuilder.closeTag(tagName)
+        if (this.cond != null || this.loop != null) {
+            output.jsBuilder.appendLine("function renderElt${this.id}(it) {")
+            output.jsBuilder.indent()
+            output.jsBuilder.append("return ")
+            this.toJS(output.jsBuilder, true)
+            output.jsBuilder.appendLine(";")
+            output.jsBuilder.unindent()
+            output.jsBuilder.appendLine("}")
         }
     }
 
@@ -166,10 +229,8 @@ constructor(val tagName: String, attributes: Iterable<HTMLAttribute>, children: 
 }
 
 class HTMLScriptElement
-constructor(attributes: Iterable<HTMLAttribute>, val content: Statement.ScriptBlock) :
-    HtmlNode() {
-    val attributes = attributes.toList()
-
+constructor(attributes: Iterable<MuAttribute>, val content: Statement.ScriptBlock) :
+    HTMLElement("script", attributes, null) {
 
     override fun toHtml(output: HTMLAndScriptBuilder) {
         output.htmlBuilder.startTag("script")
@@ -188,7 +249,6 @@ constructor(attributes: Iterable<HTMLAttribute>, val content: Statement.ScriptBl
         } else {
             output.htmlBuilder.enterTag()
         }
-
         output.htmlBuilder.closeTag("script")
 
     }
@@ -198,7 +258,17 @@ constructor(attributes: Iterable<HTMLAttribute>, val content: Statement.ScriptBl
     }
 }
 
-class HTMLAttribute(val attributeName: String, val attributeValue: Expr?) : HtmlNode() {
+class MuAttribute(val name: String, val value: Expr?) {
+
+}
+
+class HTMLAttribute
+constructor(val parent: HTMLElement, val attributeName: String, val attributeValue: Expr?) : HtmlNode() {
+    override val id: Int
+        get() {
+            return parent.id
+        }
+
     override fun toHtml(output: HTMLAndScriptBuilder) {
 
         output.htmlBuilder.append(attributeName)
@@ -226,24 +296,23 @@ class HTMLAttribute(val attributeName: String, val attributeValue: Expr?) : Html
 }
 
 class HTMLExpr(val content: Expr) : HtmlNode() {
-    val id = ++idCounter
+    private var _id = 0
+    override val id: Int
+        get() {
+            if (_id == 0) _id = (++NodeIdCounter)
+            return _id
+        }
+
     override fun toHtml(output: HTMLAndScriptBuilder) {
-        output.htmlBuilder.startTag("span")
-        output.htmlBuilder.append(""" id="muElt${id}"""")
-        output.htmlBuilder.enterTag()
-        output.htmlBuilder.append("…")
-        output.htmlBuilder.closeTag("span")
-        output.jsBuilder.append("mu.mount(muElt${id},")
+        renderPlaceHolder(output)
+        output.jsBuilder.append("mu.mount(")
         content.toJS(output.jsBuilder, true);
-        output.jsBuilder.appendLine(");")
+        output.jsBuilder.appendLine(",muElt${id});")
     }
+
 
     override fun toJS(output: JSBuilder, reactive: Boolean) {
         output.append("[TODO script...]")
-    }
-
-    companion object {
-        var idCounter = 0
     }
 }
 

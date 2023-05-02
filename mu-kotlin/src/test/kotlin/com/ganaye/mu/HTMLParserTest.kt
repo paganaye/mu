@@ -4,19 +4,19 @@ import com.ganaye.mu.emit.JSBuilder
 import com.ganaye.mu.parsing.Context
 import com.ganaye.mu.parsing.SourceFile
 import com.ganaye.mu.parsing.html.HTMLAndScriptBuilder
-import com.ganaye.mu.parsing.html.HTMLExpr.Companion.idCounter
-import org.junit.jupiter.api.Assertions.*
+import com.ganaye.mu.parsing.html.HtmlNode.Companion.NodeIdCounter
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 
 class HTMLParserTest {
     fun testHTML(source: String, expected: String) {
-        idCounter = 0
+        NodeIdCounter = 0
         val context = Context(SourceFile("/test", source))
         val ast = context.htmlParser.parseAll()
         val output = HTMLAndScriptBuilder()
         ast.toHtml(output)
         val actual = output.toString()
-        assertEquals(expected, actual)
+        assertEquals(expected.trim(), actual.trim())
     }
 
     fun testJS(source: String, expected: String) {
@@ -47,7 +47,7 @@ class HTMLParserTest {
         val source = "Hello {userName}"
         val expected = """Hello <span id="muElt1">…</span>
 <script>
-mu.mount(muElt1,userName);
+mu.mount(userName,muElt1);
 </script>
 """
         testHTML(source, expected)
@@ -123,9 +123,9 @@ let count=new Var(0.0);
 </body>
 
 <script>
-mu.mount(muElt1,muUser);
-mu.mount(muElt2,count);
-mu.mount(muElt3,mu.ternary_cond(mu.equalequal(count,1.0),"time","times"));
+mu.mount(muUser,muElt1);
+mu.mount(count,muElt2);
+mu.mount(mu.ternary_cond(mu.equalequal(count,1.0),"time","times"),muElt3);
 </script>
 </html>""".trimIndent()
         testHTML(source, expected)
@@ -148,9 +148,8 @@ user = "Pascal"
 mu.assign(user,"Pascal");
 </script>
 <script>
-mu.mount(muElt1,user);
+mu.mount(user,muElt1);
 </script>
-
 """.trimIndent()
         testHTML(source, expectedHTML)
     }
@@ -160,9 +159,8 @@ mu.mount(muElt1,user);
         val source = "Hello {user}"
         val expectedHTML = """Hello <span id="muElt1">…</span>
 <script>
-mu.mount(muElt1,user);
+mu.mount(user,muElt1);
 </script>
-
 """.trimIndent()
         testHTML(source, expectedHTML)
     }
@@ -198,4 +196,21 @@ let a=new Var(1.0);
 """.trimIndent()
         testHTML(source, expectedHTML)
     }
+
+    @Test
+    fun ifAttribute() {
+        val src = "<p if={x}>hi</p>"
+        val exp = """
+<span id="muElt1">…</span>
+<script>
+mu.mountIf(x,renderElt1,muElt1)
+function renderElt1(it) {
+  return mu.elt("p",null,"hi");
+}
+</script>
+"""
+        testHTML(src, exp)
+    }
+
+
 }

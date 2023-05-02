@@ -25,8 +25,8 @@ class HTMLParser(context: Context) :
         } else return InvalidHTML("Internal Error, Expecting HTML Element", curToken)
     }
 
-    fun parseAttributes(): List<HTMLAttribute> {
-        var attributes = mutableListOf<HTMLAttribute>()
+    fun parseAttributes(): List<MuAttribute> {
+        var attributes = mutableListOf<MuAttribute>()
         while (true) {
             var curToken = this.curToken
             when (curToken) {
@@ -42,7 +42,7 @@ class HTMLParser(context: Context) :
                     if (curToken is HTMLToken.EqualOp) {
                         attributeValue = evalExprFromHTML()
                     }
-                    attributes.add(HTMLAttribute(attributeName, attributeValue))
+                    attributes.add(MuAttribute(attributeName, attributeValue))
                 }
 
                 is HTMLToken.Spaces -> {

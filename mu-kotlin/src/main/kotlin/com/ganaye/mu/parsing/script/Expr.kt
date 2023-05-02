@@ -197,6 +197,16 @@ sealed class Expr {
 
     }
 
+    object Null : Expr() {
+        override fun toJS(output: JSBuilder, reactive: Boolean) {
+            output.append("null")
+        }
+        override val isConst: Boolean
+            get() = true
+        override val constValue: Any?
+            get() = null
+    }
+
     class Array
     constructor(content: Iterable<Expr>) : Expr() {
         val values = content.toMutableList()
