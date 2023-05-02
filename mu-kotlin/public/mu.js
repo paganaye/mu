@@ -87,8 +87,9 @@ var mu = {
   push(variable, value) {
     console.log("mu.push",{variable,value})
   },
-  simple_assign(variable,value) {
-    console.log("mu.simple_assign",{variable,value})
+  assign(variable,value) {
+    console.log("mu.assign",{variable,value})
+    if (value instanceof Expr) value=value.getValue();
     variable.setValue(value);
   },
   array(value) {
@@ -108,6 +109,7 @@ var mu = {
   },
   // the functions below are reactive and called when their arguments change
   equalequal(a, b) { return new Func([a, b], (a, b) => a == b); },
+  plus(a, b) { return new Func([a, b], (a, b) => a + b); },
   ternary_cond(a, b, c) { return new Func([a, b, c], (a, b, c) => a ? b : c); }
 }
 

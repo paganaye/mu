@@ -48,19 +48,6 @@ sealed class Expr {
         }
     }
 
-//    class InvalidExpr
-//    constructor(val message: String, val token: IToken) : Expr() {
-//        override val isConst: Boolean = false
-//        override val constValue: Any? = null
-//        override fun toJS(output: JSBuilder, reactive: Boolean) {
-//            output.append(this.toString())
-//        }
-//
-//        override fun toString(): String {
-//            return "** ERROR : $message $token at ${token.pos}"
-//        }
-//    }
-
     class UnaryOp(val op: Operator, val expr: Expr) : Expr() {
         override val isConst: Boolean = expr.isConst
         override val constValue: Any? = { throw NotImplementedError() }
@@ -87,6 +74,7 @@ sealed class Expr {
             if (isConst) {
                 output.append(JSON.stringify(constValue))
             } else {
+
                 if (reactive) {
                     output.append("mu.${op.name}(")
                     left.toJS(output, true)

@@ -94,7 +94,7 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
     fun parseExprLine(fromToken: ScriptToken): Statement {
         val leftExpr = parseExpr(fromToken)
         val curToken = this.curToken
-        if (curToken is ScriptToken.OpToken && curToken.operator.assign) {
+        if (curToken is ScriptToken.OpToken && curToken.operator.isAssignment) {
             return parseAssign(leftExpr)
         } else {
             return Statement.VoidExprLine(leftExpr)
@@ -312,7 +312,7 @@ class ScriptParser(context: Context) : BaseParser<ScriptToken, Statement>(contex
             val variableName = curToken.identifier
             var initialValue: Expr? = null
             curToken = nextToken()
-            if (this.curToken.operator == Operator.simple_assign) {
+            if (this.curToken.operator == Operator.assign) {
                 nextToken() // skip operator =
                 initialValue = parseExpr()
             }

@@ -93,7 +93,7 @@ mu.mount(muElt1,userName);
 <body>
 <script src="mu.js"></script>
 <h1>HTML says hello {muUser}</h1>
-<button onclick={count+=1}>
+<button onclick={count=count+1}>
     Clicked {count} {count == 1 ? 'time' : 'times'}
 </button>
 <script lang="mu">
@@ -113,7 +113,7 @@ let count = 0;
 <body>
 <script  src="mu.js"></script>
 <h1>HTML says hello <span id="muElt1">…</span></h1>
-<button onclick="mu.plus_assign(count,1.0)">
+<button onclick="mu.assign(count,mu.plus(count,1.0))">
     Clicked <span id="muElt2">…</span> <span id="muElt3">…</span>
 </button>
 <script  lang="mu">
@@ -145,7 +145,7 @@ user = "Pascal"
 <script  src="mu.js"></script>
 <h1>Hello <span id="muElt1">…</span></h1>
 <script>
-mu.simple_assign(user,"Pascal");
+mu.assign(user,"Pascal");
 </script>
 <script>
 mu.mount(muElt1,user);
@@ -183,8 +183,8 @@ mu.mount(muElt1,user);
 
     @Test
     fun buttonOnClick() {
-        val src = "<button onclick={count+=1}>"
-        val exp = "<button onclick=\"mu.plus_assign(count,1.0)\"/>"
+        val src = "<button onclick={count=count+1}>"
+        val exp = "<button onclick=\"mu.assign(count,mu.plus(count,1.0))\"/>"
         testHTML(src, exp)
     }
 

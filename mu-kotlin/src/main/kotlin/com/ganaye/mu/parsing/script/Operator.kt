@@ -11,7 +11,7 @@ enum class Operator(
     val uCalc: ((Any?) -> Any?)? = null,
     val bCalc: ((Any?, Any?) -> Any?)? = null,
     val nCalc: ((List<Any?>) -> Any?)? = null,
-    val assign: Boolean = false
+    val isAssignment: Boolean = false
 ) {
     // @formatter:off
     // https://www.w3schools.com/js/js_precedence.asp
@@ -24,10 +24,10 @@ enum class Operator(
     function_call       (null,         OperatorType.Func,   17                                ), //  ()         Function Call myFunction()
     new_with_args       ("new",        OperatorType.Other,  17                                ), //  new        new with Arguments new Date("June 5,2022")
     new_without_args    (null,         OperatorType.Other,  16                                ), //  new        without Arguments new Date()
-    postfix_inc         ("++",         OperatorType.Postfix,15, assign = true                 ), //  ++         Postfix Increment i++
-    postfix_dec         ("--",         OperatorType.Postfix,15, assign = true                 ), //  --         Postfix Decrement i--
-    prefix_dec          ("++",         OperatorType.Prefix, 14, assign = true                 ), //  ++         Prefix Increment ++i
-    prefix_inc          ("--",         OperatorType.Prefix, 14, assign = true                 ), //  --         Prefix Decrement --i
+    postfix_inc         ("++",         OperatorType.Postfix,15, isAssignment = true           ), //  ++         Postfix Increment i++
+    postfix_dec         ("--",         OperatorType.Postfix,15, isAssignment = true           ), //  --         Postfix Decrement i--
+    prefix_dec          ("++",         OperatorType.Prefix, 14, isAssignment = true           ), //  ++         Prefix Increment ++i
+    prefix_inc          ("--",         OperatorType.Prefix, 14, isAssignment = true           ), //  --         Prefix Decrement --i
     logical_not         ("!",          OperatorType.Prefix, 14                                ), //  !          Logical NOT !(x==y)
     bitwize_not         ("~",          OperatorType.Prefix, 14                                ), //  ~          Bitwise NOT ~x
     unary_plus          ("+",          OperatorType.Prefix, 14                                ), //  +          Unary Plus +x
@@ -61,22 +61,22 @@ enum class Operator(
     logical_or          ("||",         OperatorType.Binary, 3                                 ), //  ||         Logical OR x || y
     null_coalescing     ("??",         OperatorType.Binary, 3                                 ), //  ??         Nullish Coalescing ES2020 x ?? y
     ternary_cond        ("?",          OperatorType.Ternary,2                                 ), //  ? :        Conditional (ternary) Condition ? "yes" : "no"
-    simple_assign       ("=",          OperatorType.Binary, 2, assign = true                  ), //  =          Simple Assignment x = y
-    colon_assign        (":",          OperatorType.Binary, 2, assign = true                  ), //  :          Colon Assignment x: 5
-    plus_assign         ("+=",         OperatorType.Binary, 2, assign = true                  ), //  +=         Addition Assignment x += y
-    minus_assign        ("-=",         OperatorType.Binary, 2, assign = true                  ), //  -=         Subtraction Assignment x -= y
-    multiply_assign     ("*=",         OperatorType.Binary, 2, assign = true                  ), //  *=         Multiplication Assignment x *= y
-    exponent_assign     ("**=",        OperatorType.Binary, 2, assign = true                  ), //  **=        Exponentiation Assignment x **= y
-    divide_assign       ("/=",         OperatorType.Binary, 2, assign = true                  ), //  /=         Division Assignment x /= y
-    modulo_assign       ("%=",         OperatorType.Binary, 2, assign = true                  ), //  %=         Remainder Assignment x %= y
-    shl_assign          ("<<=",        OperatorType.Binary, 2, assign = true                  ), //  <<=        Left Shift Assignment x <<= y
-    shr_assign          (">>=",        OperatorType.Binary, 2, assign = true                  ), //  >>=        Right Shift Assignment x >>= y
-    ushr_assign         (">>>=",       OperatorType.Binary, 2, assign = true                  ), //  >>>=       Unsigned Right Shift x >>>= y
-    bitwise_and_assign  ("&=",         OperatorType.Binary, 2, assign = true                  ), //  &=         Bitwise AND Assignment x &= y
-    bitwise_or_assign   ("|=",         OperatorType.Binary, 2, assign = true                  ), //  |=         Bitwise OR Assignment x |= y
-    bitwise_xor_assign  ("^=",         OperatorType.Binary, 2, assign = true                  ), //  ^=         Bitwise XOR Assignment x ^= y
-    logical_and_assign  ("&&=",        OperatorType.Binary, 2, assign = true                  ), //  &&=        Logical AND Assignment x &= y
-    logical_or_assign   ("||=",        OperatorType.Binary, 2, assign = true                  ), //  ||=        Logical OR Assignment x ||= y
+    assign              ("=",          OperatorType.Binary, 2, isAssignment = true            ), //  =          Simple Assignment x = y
+    colon_assign        (":",          OperatorType.Binary, 2, isAssignment = true            ), //  :          Colon Assignment x: 5
+    plus_assign         ("+=",         OperatorType.Binary, 2, isAssignment = true            ), //  +=         Addition Assignment x += y
+    minus_assign        ("-=",         OperatorType.Binary, 2, isAssignment = true            ), //  -=         Subtraction Assignment x -= y
+    multiply_assign     ("*=",         OperatorType.Binary, 2, isAssignment = true            ), //  *=         Multiplication Assignment x *= y
+    exponent_assign     ("**=",        OperatorType.Binary, 2, isAssignment = true            ), //  **=        Exponentiation Assignment x **= y
+    divide_assign       ("/=",         OperatorType.Binary, 2, isAssignment = true            ), //  /=         Division Assignment x /= y
+    modulo_assign       ("%=",         OperatorType.Binary, 2, isAssignment = true            ), //  %=         Remainder Assignment x %= y
+    shl_assign          ("<<=",        OperatorType.Binary, 2, isAssignment = true            ), //  <<=        Left Shift Assignment x <<= y
+    shr_assign          (">>=",        OperatorType.Binary, 2, isAssignment = true            ), //  >>=        Right Shift Assignment x >>= y
+    ushr_assign         (">>>=",       OperatorType.Binary, 2, isAssignment = true            ), //  >>>=       Unsigned Right Shift x >>>= y
+    bitwise_and_assign  ("&=",         OperatorType.Binary, 2, isAssignment = true            ), //  &=         Bitwise AND Assignment x &= y
+    bitwise_or_assign   ("|=",         OperatorType.Binary, 2, isAssignment = true            ), //  |=         Bitwise OR Assignment x |= y
+    bitwise_xor_assign  ("^=",         OperatorType.Binary, 2, isAssignment = true            ), //  ^=         Bitwise XOR Assignment x ^= y
+    logical_and_assign  ("&&=",        OperatorType.Binary, 2, isAssignment = true            ), //  &&=        Logical AND Assignment x &= y
+    logical_or_assign   ("||=",        OperatorType.Binary, 2, isAssignment = true            ), //  ||=        Logical OR Assignment x ||= y
     lambda              ("=>",         OperatorType.Lambda, 2                                 ), //  =>         Arrow x => y
     yield_op            ("yield",      OperatorType.Other,  2                                 ), //  yield      Pause / Resume yield x
     yield_star          ("yield*",     OperatorType.Other,  2                                 ), //  yield*     Delegate yield* x

@@ -4,20 +4,20 @@
     <meta charset="utf-8">
     <title>Welcome to Mu</title>
     <link rel="stylesheet" href="styles.css">
+    <script src="mu.js"></script>
 </head>
 <body>
-<script src="mu.js"></script>
+<script lang="mu">
+let count = 0;
+</script>
 <a href="/">Back to main page</a>
 <h1>Mu Counter</h1>
 <p>When the counter is equal to 1 the button will display 'Clicked 1 time' without the s.</p>
-<button onclick={count+=1}>
+<button onclick={count=count+1}>
     Clicked {count} {count == 1 ? 'time' : 'times'}
 </button>
 <button onclick={count=0}>
     Reset
 </button>
-<script lang="mu">
-let count = 0;
-</script>
 </body>
 </html>
