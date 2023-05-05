@@ -1,9 +1,10 @@
-import { elt } from "../mu";
+import { Var, elt } from "../mu";
+import { ExamplePage } from "./examples";
 
-let src = "https://picsum.photos/id/30/150/100";
+let src = new Var("https://picsum.photos/id/30/150/100");
 let desc = "Red mug";
 
-let exampleOutput = elt("img", { src, alt: `Picsum photo: ${desc}` })
+let exampleOutput = elt("img", { src: src.getValue(), alt: `Picsum photo: ${desc}` })
 
 export default {
     content: exampleOutput

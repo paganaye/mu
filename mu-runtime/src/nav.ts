@@ -1,16 +1,6 @@
-import { div, each, elt, Attributes, MuElt } from "./mu";
+import { Page, Section } from "./examples/examples";
+import { div, each, elt, Attributes } from "./mu";
 
-interface Section {
-    section: string;
-    pages: Page[]
-}
-
-interface Page {
-    page: string;
-    url?: string;
-    content?: MuElt;
-    external?: boolean
-}
 
 let sections: Section[] = [
     {
@@ -25,7 +15,7 @@ let sections: Section[] = [
     }, {
         section: "STYLING", pages: [
             { page: "Styling" },
-            { page: "Nested components" },
+            { page: "Global CSS" },
             { page: "HTML tags" }
         ]
     }, {

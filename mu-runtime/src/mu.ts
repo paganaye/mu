@@ -62,33 +62,32 @@ function freeze<T>(source: T | Dynamic<T>, listener: (value: T) => void, tempVal
     return result;
 }
 
-
-function cssObjectToString(attr: ConstAttr): string | undefined {
-    switch (typeof attr) {
-        case "string":
-            return attr;
-        default:
-            if (isObjectAndNotArray(attr)) {
-                let result: string[] = [];
-                for (let key in (attr as object)) {
-                    result.push(key + ": " + (attr as any)[key].toString())
-                }
-                return result.join("; ");
-            } else if (attr == null || attr == undefined) {
-                return undefined
-            } else {
-                return `/* unexpected style ${attr} */`
+function cssFreeze(source: Attribute, multiLine: boolean, listener: (value: string) => void) {
+    function getCssString(_ignored: Attribute) {
+        let result: string[] = [];
+        console.log({ source });
+        if (typeof source === "string") result.push(source);
+        else if (isObjectAndNotArray(source)) {
+            for (let key in source as object) {
+                let value = (source as any)[key];
+                value = freeze(value, getCssString, "", false)
+                result.push(key + ": " + value)
             }
+        } else {
+            console.warn("cssFreeze", { source });
+        }
+        listener(multiLine ? result.map(s => "  " + s).join(";\n") : result.join("; "))
     }
+    freeze(source, getCssString, "", true);
 }
+
 
 function toCSSAttr(attr: Attribute, elt: HTMLElement): void {
 
-    freeze(attr, (value: ConstAttr) => {
-        let newValue = cssObjectToString(value);
-        if (newValue) elt.setAttribute("style", newValue)
+    cssFreeze(attr, false, (value: string) => {
+        if (value) elt.setAttribute("style", value)
         else elt.removeAttribute("style")
-    }, "", true);
+    });
 }
 
 interface CompiledCss {
@@ -99,8 +98,7 @@ let globalCss: Record<string, CompiledCss> = {};
 
 export function css(selectors: string | string[], attr: Attribute) {
     let selector: string = Array.isArray(selectors) ? selectors.join(', ') : selectors;
-    freeze(attr, (value: ConstAttr) => {
-        let newContent = cssObjectToString(value);
+    cssFreeze(attr, true, (newContent: string) => {
         let current = globalCss[selector];
         if (newContent) {
             if (!current) {
@@ -108,14 +106,15 @@ export function css(selectors: string | string[], attr: Attribute) {
                     content: newContent,
                     styleElt: document.createElement("style")
                 }
+                globalCss[selector] = current;
                 document.head.appendChild(current.styleElt);
             }
-            current.styleElt.innerHTML = selector + ": {" + newContent + "}";
+            current.styleElt.innerHTML = selector + " {\n  " + newContent + "\n}";
         } else if (current) {
             current.styleElt.remove();
             delete globalCss[selector];
         }
-    }, "", true);
+    });
 }
 
 function addChild(parent: HTMLElement, child: MuElt) {
@@ -295,11 +294,7 @@ export class Var<T> extends Expr<T> {
         return res
     }
 
-    static new<T>(name: string, value: T): Var<T> {
-        return new Var(undefined, name, value);
-    }
-
-    protected constructor(parent: Var<any> | undefined, readonly variableName: string, readonly initialValue: T) {
+    public constructor(readonly initialValue: T, variableName: string = "unnamed-variable", parent: Var<any> | undefined = undefined) {
         super(parent, variableName, initialValue);
         if (isObjectOrArray(initialValue)) {
             Var.objectVars.set(initialValue as object, this as Var<object>);
@@ -338,7 +333,7 @@ export class Var<T> extends Expr<T> {
 class MemberVar<T> extends Var<T> {
     // member variables need to change the r
     public constructor(parent: Var<any>, readonly variableName: string, readonly initialValue: T) {
-        super(parent, variableName, initialValue);
+        super(initialValue, variableName, parent);
     }
 
     protected override onValueChanging(newValue: T, originalValue: T | undefined): boolean {
@@ -390,7 +385,7 @@ export class DeepReactive<T> extends Expr<T> {
         args.forEach(a => {
             if (typeof a === "object") {
                 if (!(a instanceof Expr)) {
-                    a = Var.get(a, () => Var.new("DeepFunc", a));
+                    a = Var.get(a, () => new Var(a));
                 }
                 if (a instanceof Expr) a.addDeepListener(onArgChanged, true);
             }

@@ -6,3 +6,14 @@ export interface ExamplePage {
     outputTitle?: string
 }
 
+export interface Section {
+    section: string;
+    pages: Page[]
+}
+
+export interface Page {
+    page: string;
+    url?: string;
+    content?: MuElt;
+    external?: boolean
+}

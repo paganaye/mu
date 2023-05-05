@@ -1,7 +1,7 @@
 import { ExamplePage } from "./examples";
 import { Var, elt, watch } from "../mu";
 
-let loggedIn = Var.new("count", false);
+let loggedIn = new Var("count", false);
 
 let exampleOutput = watch([loggedIn], () => {
     if (loggedIn.getValue()) {

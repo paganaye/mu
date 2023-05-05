@@ -1,7 +1,7 @@
 import { ExamplePage } from "./examples";
 import { Var, elt, watch } from "../mu";
 
-let count = Var.new("count", 1);
+let count = new Var("count", 1);
 
 watch([count], () => {
     if (count.getValue() >= 5) {

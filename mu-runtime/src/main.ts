@@ -1,15 +1,15 @@
-import { ExamplePage } from "./examples/examples.ts";
+import { ExamplePage, Page } from "./examples/examples.ts";
 import { Var, div, mount, watch, elt } from "./mu.ts"
 import { homePage, nav, pageByUrl } from "./nav.ts"
 //----------------------------
-let page = Var.new("page", getCurrentHashPage());
+let $page = new Var<Page>(getCurrentHashPage());
 
-function getCurrentHashPage() {
+function getCurrentHashPage(): Page {
   let hash = window.location.hash;
   if (hash.length > 1 && hash[0] == '#') hash = hash.substring(1);
   return pageByUrl[hash] ?? homePage;
 }
-window.onhashchange = () => page.setValue(getCurrentHashPage())
+window.onhashchange = () => $page.setValue(getCurrentHashPage())
 
 mount(
   watch([], () => {
@@ -19,15 +19,15 @@ mount(
       },
         nav({ class: "left" }),
         div({ style: "display: flex; flex-direction: column;" },
-          elt("h2", {}, watch([page], () => page.getValue().page)),
-          div({}, watch([page], () => {
-            let url = page.getValue().url
+          div({}, watch([$page], () => {
+            let page = $page.getValue()
             return div({},
+              elt("h1", null, page.page),
               elt("h2", null, "source"),
               elt("pre", {},
                 new Promise((resolve, reject) => {
                   var client = new XMLHttpRequest();
-                  client.open('GET', "/src/examples/" + url + ".ts?raw"); // raw makes vite expose the .ts (not compiled)
+                  client.open('GET', "/src/examples/" + page.url + ".ts?raw"); // raw makes vite expose the .ts (not compiled)
                   let source: string = "";
                   client.onload = () => {
                     if (client.status === 0 || (client.status >= 200 && client.status < 400)) {
@@ -48,7 +48,7 @@ mount(
               elt("h2", null, "output"),
               async () => {
                 try {
-                  let importResult = await import("./examples/" + url + ".ts");
+                  let importResult = await import("./examples/" + page.url + ".ts");
                   let examplePage = importResult.default as ExamplePage;
                   console.log({ examplePage });
                   return examplePage.content as any;

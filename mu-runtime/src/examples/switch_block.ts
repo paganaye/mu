@@ -3,7 +3,7 @@ import { ExamplePage } from "./examples";
 
 type State = "Liquid" | "Solid" | "Gas";
 
-let state = Var.new<State>("state", "Solid");
+let state = new Var<State>("state", "Solid");
 
 function transitionButton(text: string, newState: State) {
     return elt("button", { onclick: () => { state.setValue(newState) } }, text);

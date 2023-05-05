@@ -1,7 +1,7 @@
 import { ExamplePage } from "./examples";
 import { iif, Var, div, elt } from "../mu";
 
-let loggedIn = Var.new("count", false);
+let loggedIn = new Var("count", false);
 
 let exampleOutput = div(null,
     iif(loggedIn,
