@@ -39,8 +39,11 @@ function freeze<T>(source: T | Dynamic<T>, listener: (value: T) => void, tempVal
                 source = (source as Function)();
             } else if (source instanceof Expr) {
                 let expr = source;
-                source.addListener(() => {
-                    listener!(doFreeze(expr.getValue()))
+                source.addListener({
+                    owner: null as any,
+                    onExprChanged: () => {
+                        listener!(doFreeze(expr.getValue()))
+                    }
                 })
                 source = source.getValue();
             } else if (source instanceof Promise) {
@@ -106,7 +109,6 @@ export function css(selectors: string | string[], attr: Attribute) {
                     content: newContent,
                     styleElt: document.createElement("style")
                 }
-                globalCss[selector] = current;
                 document.head.appendChild(current.styleElt);
             }
             current.styleElt.innerHTML = selector + " {\n  " + newContent + "\n}";
@@ -144,10 +146,10 @@ function applyAttributes(elt: HTMLElement, attrs?: Attributes) {
 }
 
 export function elt(tag: string, attrs?: Attributes | null, ...children: MuElt[]): HTMLElement {
-    let rootElt: HTMLElement = document.createElement(tag);
-    if (attrs) applyAttributes(rootElt, attrs);
-    children?.forEach(child => addChild(rootElt, child));
-    return rootElt;
+    let domElt: HTMLElement = document.createElement(tag);
+    if (attrs) applyAttributes(domElt, attrs);
+    children?.forEach(child => addChild(domElt, child));
+    return domElt;
 }
 
 export function html(tagName: string, attrs: Attributes | null, content: string): HTMLElement {
@@ -204,11 +206,36 @@ export function eachVar<T extends Object>(items: Var<T[]>, content: (this: EachV
     return new EachVar(items, content, eachOptions) as any;
 }
 
+class ShadowNode {
+    static ShadowNodes = new WeakMap<Node, ShadowNode>()
+
+    static get(node: Node): ShadowNode {
+        let res: ShadowNode | undefined;
+        res = ShadowNode.ShadowNodes.get(node);
+        if (!res) {
+            res = new ShadowNode(node);
+        }
+        return res;
+    }
+
+    constructor(readonly node: Node) { }
+    dispose(): void { }
+    children?: ShadowNode[];
+}
+
+interface ExprListener {
+    owner: ShadowNode;
+    onExprChanged(): void
+}
+
+interface DeepListener {
+    onMemberChanged(memberName: string, newValue: any): void
+}
 
 class Expr<T> {
     private value: T | undefined;
-    listeners?: (() => void)[];
-    deepListeners?: ((variableName: string, newValue: any) => void)[];
+    listeners?: ExprListener[];
+    deepListeners?: DeepListener[];
     readonly variableName: string;
     static variableNameCounters = new Map<string, number>()
 
@@ -223,16 +250,22 @@ class Expr<T> {
         if (initialValue !== undefined) this.setValue(initialValue);
     }
 
-    addListener(listener: () => void, init = false) {
+    addListener(listener: ExprListener, init = false) {
         let listeners = this.listeners || (this.listeners = []);
         listeners.push(listener);
-        if (init) listener.call(null);
+        if (init) listener.onExprChanged();
     }
 
-    addDeepListener(deepListener: (variableName: string) => void, init = false) {
+    removeListener(listener: ExprListener) {
+        if (!this.listeners) return
+        let idx = this.listeners.indexOf(listener)
+        if (idx >= 0) this.listeners?.splice(idx, 1);
+    }
+
+    addDeepListener(deepListener: DeepListener, init = false) {
         let deepListeners = this.deepListeners || (this.deepListeners = []);
         deepListeners.push(deepListener);
-        if (init) deepListener.call(null, this.variableName ?? "Expr");
+        if (init) deepListener.onMemberChanged(this.variableName ?? "Expr", null);
     }
 
     getValue(): T {
@@ -256,7 +289,7 @@ class Expr<T> {
         if (newValue === originalValue) return;
         if (this.onValueChanging(newValue, originalValue)) {
             this.value = newValue;
-            this.listeners?.forEach(listener => listener.call(null));
+            this.listeners?.forEach(listener => listener.onExprChanged());
             if (this.parent) {
                 this.parent.onChildValueChanged(this.variableName, newValue)
             }
@@ -268,7 +301,7 @@ class Expr<T> {
     }
 
     protected onChildValueChanged(variableName: string, newValue: any) {
-        this.deepListeners?.forEach(deepListener => deepListener.call(null, variableName, newValue));
+        this.deepListeners?.forEach(deepListener => deepListener.onMemberChanged(variableName, newValue), null);
         if (this.parent) {
             this.parent.onChildValueChanged(variableName, newValue)
         }
@@ -278,7 +311,6 @@ class Expr<T> {
 
 export class Var<T> extends Expr<T> {
     static objectVars = new WeakMap<object, Var<object>>()
-    cachedMemberVars?: { [key: string | number]: Var<any> };
 
     static get<T>(initialValue: any, createNew: () => Var<T>): Var<T> {
         let res: Var<T> | undefined;
@@ -312,9 +344,6 @@ export class Var<T> extends Expr<T> {
     }
 
     public getMemberVar<U>(memberName: string | number): Var<U> {
-        let cachedResult = this.cachedMemberVars && this.cachedMemberVars[memberName];
-        if (cachedResult) return cachedResult;
-
         let thisValue = this.getValue() as any;
         if (typeof thisValue !== 'object') throw Error("Cannot get member of " + typeof thisValue);
         let memberValue = thisValue[memberName];
@@ -324,7 +353,6 @@ export class Var<T> extends Expr<T> {
         if (this instanceof Var<U>) {
             result = Var.get(memberValue, () => new MemberVar(this as any, memberNameString, memberValue)) as Var<U>
         } else throw Error("Cannot get variable members from something that is not a Var");
-        (this.cachedMemberVars || (this.cachedMemberVars = {}))[memberName] = result;
         return result;
     }
 
@@ -352,12 +380,15 @@ class Reactive<T> extends Expr<T> {
 
     constructor(readonly args: Expr<any>[], readonly lambda: (this: Reactive<any>, ...any: any) => any, immediate: boolean) {
         super(undefined, undefined, undefined);
-        let onArgChanged = () => {
-            // lamba is possibly expensive. We call it only as little as possible
-            if (this.invalidateValue()) {
-                setTimeout(() => this.calcValue());
+        let onArgChanged: ExprListener = {
+            owner: null as any,
+            onExprChanged: () => {
+                // lamba is possibly expensive. We call it only as little as possible
+                if (this.invalidateValue()) {
+                    setTimeout(() => this.calcValue());
+                }
             }
-        };
+        }
         args.forEach(a => {
             if (a instanceof Expr) a.addListener(onArgChanged, true);
         });
@@ -376,7 +407,7 @@ export class DeepReactive<T> extends Expr<T> {
 
     constructor(readonly args: (Expr<any> | any[] | object)[], readonly lambda: (this: DeepReactive<any>, ...any: any) => any) {
         super(undefined, "DeepFunc", undefined);
-        let onArgChanged = () => {
+        let onMemberChanged = () => {
             // lamba is possibly expensive. We call it only as little as possible
             if (this.invalidateValue()) {
                 setTimeout(() => this.calcValue());
@@ -387,7 +418,9 @@ export class DeepReactive<T> extends Expr<T> {
                 if (!(a instanceof Expr)) {
                     a = Var.get(a, () => new Var(a));
                 }
-                if (a instanceof Expr) a.addDeepListener(onArgChanged, true);
+                if (a instanceof Expr) a.addDeepListener({
+                    onMemberChanged
+                }, true);
             }
         });
     }
@@ -458,12 +491,13 @@ export class EachVar<T> extends Reactive<T> {
     }
 }
 
-export function mount(v: Expr<MuElt>, elt: HTMLElement) {
-    let result = v.getValue() as HTMLDivElement;
-    v.addListener(() => {
-        elt.replaceChildren(...Array.from(result.childNodes));
-    }, true);
-    console.log('Mounted', v.getValue(), elt);
+export function mount(v: MuElt, elt: HTMLElement | string) {
+    let htmlElement = (typeof elt === "string")
+        ? document.getElementById(elt)!
+        : elt!;
+    freeze(v, (o) => {
+        htmlElement.replaceChildren(toElt(o))
+    }, "…", true)
 }
 
 function isObjectOrArray(o: any) {
@@ -492,8 +526,11 @@ export function span(attrs?: Attributes | null, ...children: MuElt[]): HTMLEleme
 
 export function numberInput(v: Var<number>, attrs: Attributes | null = null): HTMLInputElement {
     let e = elt('input', { ...attrs, type: "number" }) as HTMLInputElement;
-    v.addListener(() => {
-        e.value = v.getValue().toString();
+    v.addListener({
+        owner: null as any,
+        onExprChanged: () => {
+            e.value = v.getValue().toString();
+        }
     }, true);
     e.oninput = () => v.setValue(+e.value);
     return e;
@@ -501,8 +538,11 @@ export function numberInput(v: Var<number>, attrs: Attributes | null = null): HT
 
 export function booleanInput(v: Var<boolean>, attrs: Attributes | null = null): HTMLInputElement {
     let e = elt('input', { ...attrs, type: "checkbox" }) as HTMLInputElement;
-    v.addListener(() => {
-        e.value = v.getValue().toString();
+    v.addListener({
+        owner: null as any,
+        onExprChanged: () => {
+            e.value = v.getValue().toString();
+        }
     }, true);
     e.oninput = () => v.setValue(!!e.value);
     return e;
@@ -510,8 +550,11 @@ export function booleanInput(v: Var<boolean>, attrs: Attributes | null = null): 
 
 export function textInput(v: Var<string>, attrs: Attributes | null = null): HTMLInputElement {
     let e = elt('input', { ...attrs }) as HTMLInputElement;
-    v.addListener(() => {
-        e.value = v.getValue()?.toString();
+    v.addListener({
+        owner: null as any,
+        onExprChanged: () => {
+            e.value = v.getValue()?.toString();
+        }
     }, true);
     e.oninput = () => v.setValue(e.value);
     return e;

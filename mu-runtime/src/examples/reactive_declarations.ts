@@ -1,7 +1,7 @@
 import { Var, div, elt, p, watch } from "../mu";
 import { ExamplePage } from "./examples";
 
-let count = new Var("count", 1);
+let count = new Var(1);
 
 let exampleOutput = div(null,
     elt("button", { onclick: () => count.setValue(count.getValue() + 1) }, "Count is ", count),

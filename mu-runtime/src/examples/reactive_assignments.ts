@@ -1,6 +1,7 @@
 import { Var, elt } from "../mu";
+import { ExamplePage } from "./examples";
 
-let count = new Var("count", 1);
+let count = new Var(1, "count");
 
 let exampleOutput = elt("button",
     { onclick: () => count.setValue(count.getValue() + 1) },
