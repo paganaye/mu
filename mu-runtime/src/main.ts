@@ -1,61 +1,67 @@
-import { repeat, Var, booleanInput, div, mount, numberInput, p, span, Reactive, each as eachConst, eachVar as eachVar, elt, Mu, DeepReactive, textInput } from "./mu.ts"
+import { Var, div, mount, watch, elt } from "./mu.ts"
+import { homePage, nav, pageByUrl } from "./nav.ts"
 //----------------------------
-let x = Var.new("x", true);
-let y = Var.new("y", false);
-let r = Var.new("r", 5);
-let s = Var.new("s", 5);
+let page = Var.new("page", homePage);
 
-interface Month {
-  abbr: string;
-  name: string;
-  days: number;
+
+
+window.onhashchange = () => {
+  let hash = window.location.hash;
+  if (hash.length > 1 && hash[0] == '#') hash = hash.substring(1);
+  let newPage = pageByUrl[hash];
+  if (page) page.setValue(newPage);
 }
 
-let months: Month[] = [
-  { abbr: "Jan", name: "January", days: 31 }, { abbr: "Feb", name: "February", days: 28 },
-  { abbr: "Mar", name: "March", days: 31 }, { abbr: "Apr", name: "April", days: 30 },
-  { abbr: "May", name: "May", days: 31 }, { abbr: "Jun", name: "June", days: 30 },
-  { abbr: "Jul", name: "July", days: 31 },
-  { abbr: "Aug", name: "August", days: 31 }, { abbr: "Sep", name: "September", days: 30 },
-  { abbr: "Oct", name: "October", days: 31 }, { abbr: "Nov", name: "November", days: 30 },
-  { abbr: "Dec", name: "December", days: 31 }];
-
-let $months = Var.new("months", months);
-
 mount(
-  new Reactive([], () => {
+  watch([], () => {
     return div(null,
-      div(null, "r", numberInput(r), r),
-      div(null, "s", numberInput(s), s),
-      div(null, booleanInput(x), "x"),
-      () => div(null, booleanInput(y), "y"),
-      repeat(s, (i) => {
-        return div(null, "row ", i,
-          repeat(r, (j) => span(null, '(' + j + ',' + i + ") "))
-        )
-      }),
-      eachVar($months, ($month, _idx, _context) => {
-        let month = $month.getValue();
-        return elt("li", null, month.abbr, " ",
-          textInput($month.getMemberVar("name")), " ",
-          numberInput($month.getMemberVar("days")))
-      }),
-      div(null,
-        Mu.if(
-          x,
-          p(null, "as x is true we show if (y)",
-            Mu.if(
-              y,
-              p(null, "y is true",
-                span(null, " (in y is true)")),
-              p(null, "y is false",
-                span(null, " (in y is false)"))
+      div({
+        style: "display: flex; flex-direction: row;"
+      },
+        nav({ class: "left" }),
+        div({ style: "display: flex; flex-direction: column;" },
+          elt("h2", {}, watch([page], () => page.getValue().page)),
+          div({}, watch([page], () => {
+            let url = page.getValue().url
+            return div({},
+              elt("h2", null, "source"),
+              elt("pre", {},
+                new Promise((resolve, reject) => {
+                  var client = new XMLHttpRequest();
+                  client.open('GET', "/src/" + url + ".ts");
+                  let source: string = "";
+                  client.onload = () => {
+                    if (client.status === 0 || (client.status >= 200 && client.status < 400)) {
+                      source = client.responseText;
+                      let cleanedSource = source
+                        .replace(/(import.*\/mu\.ts.*\n|\n\/\/# sourceMapping.*)/gm, "")
+                        .replace("export default", "return");
+                      resolve(cleanedSource)
+                    } else {
+                      reject(client.statusText)
+                    }
+                  }
+                  client.send();
+                })
+              ),
+              elt("h2", null, "output"),
+              async () => {
+                let content: string;
+                try {
+                  let importResult = (await import("./" + url + ".ts") as any);
+                  content = importResult.default
+                  console.log({ importResult });
+
+                } catch (error: any) {
+                  content = "The page " + page.getValue().url + " doesn't exist yet or is not accessible now.";
+                }
+                return content;
+              }
             )
-          ),
-          p(null, "x is false")
-        )),
-      elt("pre", null, new DeepReactive([months], () => JSON.stringify(months, undefined, "  ")))
-    );
+          }))
+        )
+      )
+    )
   }),
-  document.body
+  document.getElementById("app")!
 );

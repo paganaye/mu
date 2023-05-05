@@ -7,70 +7,75 @@ export class Mu {
 
 }
 
-type Attributes = Record<string, any>;
+export type Attributes = Record<string, any>;
 
-function toElt(value: MuElt): Node | undefined {
-    do {
-        if (typeof value === 'function') value = (value as Function)();
-        else if (value instanceof Expr) value = value.getValue();
-        else break;
-    } while (true);
+
+function toElt(value: ConcreteMuElt): Node {
     switch (typeof value) {
         case 'boolean':
         case 'string':
         case 'number':
             let textNode = document.createTextNode(value.toString());
             return textNode;
-        case 'undefined':
-            // ignore
-            return undefined;
         default:
-            if (value == null) return undefined;
-            if (value instanceof Node) {
+            if (value === null) return document.createComment("null");
+            else if (value === undefined) return document.createComment("undefined");
+            else if (value instanceof Node) {
                 return value;
+            } else if (value instanceof Error) {
+                return div({ class: "error" },
+                    p(null, elt("span", null, value.name), value.message),
+                    elt("pre", null, value.stack)
+                )
             } else {
-                console.warn({ value });
-                throw Error('Unexpected value ' + typeof (value));
+                let message = `Unexpected value ${typeof value} ${JSON.stringify(value)}`;
+                console.warn(message, { value });
+                return document.createComment(message);
             }
     }
+}
+
+function toConcretedMuElt(child: MuElt, listener: (newMuElt: ConcreteMuElt) => void): ConcreteMuElt {
+    for (let i = 0; i < 25; i++) {
+        if (typeof child === 'function') {
+            child = (child as Function)();
+        } else if (child instanceof Expr) {
+            let expr = child;
+            child.addListener(() => {
+                let newElt = toConcretedMuElt(expr, () => listener!)
+                listener!(newElt)
+            })
+            child = child.getValue();
+        } else if (child instanceof Promise) {
+            child.then((muElt: MuElt) => {
+                let newElt = toConcretedMuElt(muElt, () => listener!)
+                listener!(newElt)
+            }).catch((reason: any) => {
+                listener!(reason)
+            })
+            return "…"
+        } else {
+            return child;
+        }
+    }
+    console.warn("Stack overflow in toConcretedMuElt", { child })
 }
 
 function addChild(parent: HTMLElement, child: MuElt) {
-    let value;
-    let childElt: Node | undefined = toElt(child);
-    if (typeof child === 'function') child = (child as Function)();
-    if (child instanceof Expr) {
-        value = child.getValue();
-    } else {
-        value = child;
-    }
-    if (childElt) parent.appendChild(childElt);
+    let childElt: Node | undefined;
 
-    if (child instanceof Expr) {
-        child.addListener(() => {
-            value = (child as Expr<MuElt>).getValue();
-            if (!(value instanceof Node)) {
-                if (childElt instanceof Text) {
-                    childElt.nodeValue = value!.toString();
-                    return
-                }
-                else value = document.createTextNode(value as any);
-            }
-            if (childElt && !Array.isArray(childElt) && childElt.parentNode) {
-                childElt.parentNode.replaceChild(value, childElt);
-                childElt = value;
-            } else {
-                console.warn("Cannot replace child", { current: childElt, new: value })
-            }
-        });
-        if (!childElt) {
-            childElt = document.createComment("Expr");
-            parent.appendChild(childElt);
+    child = toConcretedMuElt(child, (newMuElt) => {
+        if (childElt && childElt.parentNode) {
+            let newElt = toElt(newMuElt)!;
+            childElt.parentNode.replaceChild(newElt, childElt);
+            childElt = newElt;
         }
-    }
+    });
+    childElt = toElt(child);
+    parent.appendChild(childElt);
 }
 
-export function elt(tag: string, attrs: Attributes | null, ...children: MuElt[]): HTMLElement {
+export function elt(tag: string, attrs?: Attributes | null, ...children: MuElt[]): HTMLElement {
     let rootElt: HTMLElement = document.createElement(tag);
     if (attrs) {
         for (let name in attrs) {
@@ -253,7 +258,7 @@ export class Var<T> extends Expr<T> {
         } else throw Error("Cannot get variable members from something that is not a Var");
         (this.cachedMemberVars || (this.cachedMemberVars = {}))[memberName] = result;
         return result;
-    }      
+    }
 
 }
 
@@ -267,10 +272,14 @@ class MemberVar<T> extends Var<T> {
         this.parent!.getValue()[this.variableName] = newValue;
         return super.onValueChanging(newValue, originalValue);
 
-    }  
+    }
 }
 
-export class Reactive<T> extends Expr<T> {
+export function watch(watch: Expr<any>[], lambda: (this: Reactive<any>, ...any: Expr<any>[]) => any): Expr<MuElt> {
+    return new Reactive(watch, lambda);
+}
+
+class Reactive<T> extends Expr<T> {
     state?: any;
 
     constructor(readonly args: Expr<any>[], readonly lambda: (this: Reactive<any>, ...any: any) => any) {
@@ -287,8 +296,8 @@ export class Reactive<T> extends Expr<T> {
     }
 
     calcValue(): void {
-        let argValues = this.args.map(a => (a instanceof Expr ? a.getValue() : a));
-        let newValue = this.lambda.apply(this, argValues);
+        // let argValues = this.args.map(a => (a instanceof Expr ? a.getValue() : a));
+        let newValue = this.lambda.apply(this, this.args);
         this.setValue(newValue);
     }
 }
@@ -337,8 +346,7 @@ class RepeatFunc<T> extends Reactive<T> {
                 do {
                     let newContent = content(state.count, this);
                     if (newContent) {
-                        newContent = toElt(newContent)  //  newContent = deepClone(newContent)
-                        if (newContent) state.root.append(newContent);
+                        addChild(state.root, newContent)
                     }
                     state.count += 1;
                 } while (state.count < newCountValue);
@@ -369,8 +377,7 @@ export class EachVar<T> extends Reactive<T> {
                 // let entryVar = Var.get(itemsVar, `${itemsVar.variableName}[${idx}]`, _it);
                 let newContent = content(itemsVar.getMemberVar(idx), idx, this);
                 if (newContent) {
-                    newContent = toElt(newContent)  // deepClone(newContent)
-                    if (newContent) state.root.append(newContent);
+                    addChild(state.root, newContent);
                 }
             })
             return state.root;
@@ -382,7 +389,10 @@ export class EachVar<T> extends Reactive<T> {
     }
 }
 
-type MuElt = Node | string | number | boolean | null | undefined | (() => MuElt) | Expr<MuElt> | Promise<MuElt>;
+
+export type FuncMuElt = (() => MuElt) | Expr<MuElt> | Promise<MuElt>;
+export type ConcreteMuElt = Node | string | number | boolean | null | undefined | Error;
+export type MuElt = FuncMuElt | ConcreteMuElt;
 
 export function mount(v: Expr<MuElt>, elt: HTMLElement) {
     let result = v.getValue() as HTMLDivElement;
@@ -392,15 +402,15 @@ export function mount(v: Expr<MuElt>, elt: HTMLElement) {
     console.log('Mounted', v.getValue(), elt);
 }
 
-export function p(attrs: Attributes | null, ...children: MuElt[]) {
+export function p(attrs?: Attributes | null, ...children: MuElt[]) {
     return elt('p', attrs, ...children);
 }
 
-export function div(attrs: Attributes | null, ...children: MuElt[]): HTMLDivElement {
+export function div(attrs?: Attributes | null, ...children: MuElt[]): HTMLDivElement {
     return elt('div', attrs, ...children) as HTMLDivElement;
 }
 
-export function span(attrs: Attributes | null, ...children: MuElt[]): HTMLElement {
+export function span(attrs?: Attributes | null, ...children: MuElt[]): HTMLElement {
     return elt('span', attrs, ...children);
 }
 
