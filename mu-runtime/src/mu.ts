@@ -1,16 +1,13 @@
-export class Mu {
-    static if(a: MuElt, b: MuElt, c?: MuElt): Reactive<any> {
-        return new Reactive([a as any, b, c], (a, b, c) => {
-            return (a ? b : c)
-        });
-    }
+export type Dynamic<T> = (() => T | Dynamic<T>) | Expr<T | Dynamic<T>> | Promise<T | Dynamic<T>>;
+export type ConstHTMLElt = Node | string | number | boolean | null | undefined | Error;
+export type MuElt = ConstHTMLElt | Dynamic<ConstHTMLElt>;
 
-}
-
-export type Attributes = Record<string, any>;
+export type ConstAttr = string | number | boolean | null | undefined | Attribute[] | { [key: string]: Attribute } | Error | Function;
+export type Attribute = Dynamic<ConstAttr> | ConstAttr;
+export type Attributes = Record<string, Attribute>;
 
 
-function toElt(value: ConcreteMuElt): Node {
+function toElt(value: ConstHTMLElt): Node {
     switch (typeof value) {
         case 'boolean':
         case 'string':
@@ -35,55 +32,136 @@ function toElt(value: ConcreteMuElt): Node {
     }
 }
 
-function toConcretedMuElt(child: MuElt, listener: (newMuElt: ConcreteMuElt) => void): ConcreteMuElt {
-    for (let i = 0; i < 25; i++) {
-        if (typeof child === 'function') {
-            child = (child as Function)();
-        } else if (child instanceof Expr) {
-            let expr = child;
-            child.addListener(() => {
-                let newElt = toConcretedMuElt(expr, () => listener!)
-                listener!(newElt)
-            })
-            child = child.getValue();
-        } else if (child instanceof Promise) {
-            child.then((muElt: MuElt) => {
-                let newElt = toConcretedMuElt(muElt, () => listener!)
-                listener!(newElt)
-            }).catch((reason: any) => {
-                listener!(reason)
-            })
-            return "…"
-        } else {
-            return child;
+function freeze<T>(source: T | Dynamic<T>, listener: (value: T) => void, tempValue: T, immediate: boolean): T {
+    function doFreeze(source: T | Dynamic<T>) {
+        for (let i = 0; i < 25; i++) {
+            if (typeof source === 'function') {
+                source = (source as Function)();
+            } else if (source instanceof Expr) {
+                let expr = source;
+                source.addListener(() => {
+                    listener!(doFreeze(expr.getValue()))
+                })
+                source = source.getValue();
+            } else if (source instanceof Promise) {
+                source.then((value: T | Dynamic<T>) => {
+                    listener!(doFreeze(value))
+                }).catch((reason: any) => {
+                    listener!(reason)
+                })
+                return tempValue
+            } else {
+                return source;
+            }
         }
+        console.warn("Stack overflow in toConcrete", { child: source })
+        return tempValue;
     }
-    console.warn("Stack overflow in toConcretedMuElt", { child })
+    let result = doFreeze(source);
+    if (immediate) listener(result);
+    return result;
+}
+
+
+function cssObjectToString(attr: ConstAttr): string | undefined {
+    switch (typeof attr) {
+        case "string":
+            return attr;
+        default:
+            if (isObjectAndNotArray(attr)) {
+                let result: string[] = [];
+                for (let key in (attr as object)) {
+                    result.push(key + ": " + (attr as any)[key].toString())
+                }
+                return result.join("; ");
+            } else if (attr == null || attr == undefined) {
+                return undefined
+            } else {
+                return `/* unexpected style ${attr} */`
+            }
+    }
+}
+
+function toCSSAttr(attr: Attribute, elt: HTMLElement): void {
+
+    freeze(attr, (value: ConstAttr) => {
+        let newValue = cssObjectToString(value);
+        if (newValue) elt.setAttribute("style", newValue)
+        else elt.removeAttribute("style")
+    }, "", true);
+}
+
+interface CompiledCss {
+    content: string;
+    styleElt: HTMLStyleElement;
+}
+let globalCss: Record<string, CompiledCss> = {};
+
+export function css(selectors: string | string[], attr: Attribute) {
+    let selector: string = Array.isArray(selectors) ? selectors.join(', ') : selectors;
+    freeze(attr, (value: ConstAttr) => {
+        let newContent = cssObjectToString(value);
+        let current = globalCss[selector];
+        if (newContent) {
+            if (!current) {
+                current = {
+                    content: newContent,
+                    styleElt: document.createElement("style")
+                }
+                document.head.appendChild(current.styleElt);
+            }
+            current.styleElt.innerHTML = selector + ": {" + newContent + "}";
+        } else if (current) {
+            current.styleElt.remove();
+            delete globalCss[selector];
+        }
+    }, "", true);
 }
 
 function addChild(parent: HTMLElement, child: MuElt) {
     let childElt: Node | undefined;
 
-    child = toConcretedMuElt(child, (newMuElt) => {
+    child = freeze(child, (newMuElt) => {
         if (childElt && childElt.parentNode) {
             let newElt = toElt(newMuElt)!;
             childElt.parentNode.replaceChild(newElt, childElt);
             childElt = newElt;
         }
-    });
+    }, "…", false);
     childElt = toElt(child);
     parent.appendChild(childElt);
 }
 
+function applyAttributes(elt: HTMLElement, attrs?: Attributes) {
+    for (let name in attrs) {
+        let value: Attribute = attrs[name];
+        if (typeof value === 'object' && name === "style") toCSSAttr(value, elt);
+        else if (name.startsWith('on') && typeof value === "function") {
+            // elt.setAttribute(name, "dynamic");
+            (elt as any)[name] = value;
+        }
+        else elt.setAttribute(name, value as any);
+    }
+}
+
 export function elt(tag: string, attrs?: Attributes | null, ...children: MuElt[]): HTMLElement {
     let rootElt: HTMLElement = document.createElement(tag);
-    if (attrs) {
-        for (let name in attrs) {
-            rootElt.setAttribute(name, attrs[name]);
-        }
-    }
+    if (attrs) applyAttributes(rootElt, attrs);
     children?.forEach(child => addChild(rootElt, child));
     return rootElt;
+}
+
+export function html(tagName: string, attrs: Attributes | null, content: string): HTMLElement {
+    let elt = document.createElement(tagName) as HTMLDivElement;
+    if (attrs) applyAttributes(elt, attrs);
+    elt.innerHTML = content;
+    return elt;
+}
+
+export function iif(a: Expr<boolean>, b: MuElt, c?: MuElt): Reactive<any> {
+    return new Reactive([a as any], (a) => {
+        return (a.getValue() ? b : c)
+    }, false);
 }
 
 interface ContainerOptions {
@@ -127,11 +205,6 @@ export function eachVar<T extends Object>(items: Var<T[]>, content: (this: EachV
     return new EachVar(items, content, eachOptions) as any;
 }
 
-export function html(content: string): HTMLElement {
-    let temp = document.createElement("div") as HTMLDivElement;
-    temp.innerHTML = content;
-    return temp.firstChild as HTMLElement
-}
 
 class Expr<T> {
     private value: T | undefined;
@@ -275,14 +348,14 @@ class MemberVar<T> extends Var<T> {
     }
 }
 
-export function watch(watch: Expr<any>[], lambda: (this: Reactive<any>, ...any: Expr<any>[]) => any): Expr<MuElt> {
-    return new Reactive(watch, lambda);
+export function watch(watch: Expr<any>[], lambda: (this: Reactive<any>, ...any: Expr<any>[]) => any, immediate: boolean = true): Expr<MuElt> {
+    return new Reactive(watch, lambda, immediate);
 }
 
 class Reactive<T> extends Expr<T> {
     state?: any;
 
-    constructor(readonly args: Expr<any>[], readonly lambda: (this: Reactive<any>, ...any: any) => any) {
+    constructor(readonly args: Expr<any>[], readonly lambda: (this: Reactive<any>, ...any: any) => any, immediate: boolean) {
         super(undefined, undefined, undefined);
         let onArgChanged = () => {
             // lamba is possibly expensive. We call it only as little as possible
@@ -293,6 +366,7 @@ class Reactive<T> extends Expr<T> {
         args.forEach(a => {
             if (a instanceof Expr) a.addListener(onArgChanged, true);
         });
+        if (immediate) this.calcValue()
     }
 
     calcValue(): void {
@@ -357,7 +431,7 @@ class RepeatFunc<T> extends Reactive<T> {
             }
             state.count = newCountValue;
             return state.root;
-        });
+        }, false); // or true?
     }
 }
 
@@ -381,18 +455,13 @@ export class EachVar<T> extends Reactive<T> {
                 }
             })
             return state.root;
-        });
+        }, false); // or true?
     }
 
     getEntry(idx: number): T {
         return this.itemsVar.getValue()[idx]
     }
 }
-
-
-export type FuncMuElt = (() => MuElt) | Expr<MuElt> | Promise<MuElt>;
-export type ConcreteMuElt = Node | string | number | boolean | null | undefined | Error;
-export type MuElt = FuncMuElt | ConcreteMuElt;
 
 export function mount(v: Expr<MuElt>, elt: HTMLElement) {
     let result = v.getValue() as HTMLDivElement;
@@ -401,6 +470,18 @@ export function mount(v: Expr<MuElt>, elt: HTMLElement) {
     }, true);
     console.log('Mounted', v.getValue(), elt);
 }
+
+function isObjectOrArray(o: any) {
+    return typeof o === 'object' && o !== null;
+}
+
+function isObjectAndNotArray(o: any) {
+    return typeof o === 'object' && o !== null && !Array.isArray(o);
+}
+
+// ====================================================================================
+// ============= potentially optional code which we should perhaps remove =============
+// ====================================================================================
 
 export function p(attrs?: Attributes | null, ...children: MuElt[]) {
     return elt('p', attrs, ...children);
@@ -441,9 +522,7 @@ export function textInput(v: Var<string>, attrs: Attributes | null = null): HTML
     return e;
 }
 
-function isObjectOrArray(o: any) {
-    return typeof o === 'object' && o !== null;
-}
+
 
 /*
 function deepClone(originalElt: MuElt): Node | undefined {

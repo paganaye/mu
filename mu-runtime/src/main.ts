@@ -1,16 +1,15 @@
+import { ExamplePage } from "./examples/examples.ts";
 import { Var, div, mount, watch, elt } from "./mu.ts"
 import { homePage, nav, pageByUrl } from "./nav.ts"
 //----------------------------
-let page = Var.new("page", homePage);
+let page = Var.new("page", getCurrentHashPage());
 
-
-
-window.onhashchange = () => {
+function getCurrentHashPage() {
   let hash = window.location.hash;
   if (hash.length > 1 && hash[0] == '#') hash = hash.substring(1);
-  let newPage = pageByUrl[hash];
-  if (page) page.setValue(newPage);
+  return pageByUrl[hash] ?? homePage;
 }
+window.onhashchange = () => page.setValue(getCurrentHashPage())
 
 mount(
   watch([], () => {
@@ -28,14 +27,16 @@ mount(
               elt("pre", {},
                 new Promise((resolve, reject) => {
                   var client = new XMLHttpRequest();
-                  client.open('GET', "/src/" + url + ".ts");
+                  client.open('GET', "/src/examples/" + url + ".ts?raw"); // raw makes vite expose the .ts (not compiled)
                   let source: string = "";
                   client.onload = () => {
                     if (client.status === 0 || (client.status >= 200 && client.status < 400)) {
                       source = client.responseText;
-                      let cleanedSource = source
-                        .replace(/(import.*\/mu\.ts.*\n|\n\/\/# sourceMapping.*)/gm, "")
-                        .replace("export default", "return");
+                      let cleanedSource = source.replace(/^export default '|';$/m, '').replace(/\\n/g, '\n')
+                        .replace(/import.*\.\/examples\".*\n/, "")
+                        .replace(/import.*\.\.\/mu\".*\n+/, "")
+                        .replace(/export default(.|\n)*/, "")
+                        .replace(/let exampleOutput = +/, "return ")
                       resolve(cleanedSource)
                     } else {
                       reject(client.statusText)
@@ -46,16 +47,14 @@ mount(
               ),
               elt("h2", null, "output"),
               async () => {
-                let content: string;
                 try {
-                  let importResult = (await import("./" + url + ".ts") as any);
-                  content = importResult.default
-                  console.log({ importResult });
-
+                  let importResult = await import("./examples/" + url + ".ts");
+                  let examplePage = importResult.default as ExamplePage;
+                  console.log({ examplePage });
+                  return examplePage.content as any;
                 } catch (error: any) {
-                  content = "The page " + page.getValue().url + " doesn't exist yet or is not accessible now.";
+                  return "The page " + page.getValue().url + " doesn't exist yet or is not accessible now."
                 }
-                return content;
               }
             )
           }))
