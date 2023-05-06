@@ -1,8 +1,8 @@
-import { MuElt } from "../mu"
+import { Dynamic<MuElt> } from "../mu"
 
 export interface ExamplePage {
     hideSource?: boolean
-    content?: MuElt
+    content?: Dynamic<MuElt>
     outputTitle?: string
 }
 
@@ -14,6 +14,7 @@ export interface Section {
 export interface Page {
     page: string;
     url?: string;
-    content?: MuElt;
-    external?: boolean
+    content?: Dynamic<MuElt>;
+    external?: boolean,
+    reload?: boolean
 }

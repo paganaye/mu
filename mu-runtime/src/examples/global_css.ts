@@ -10,13 +10,13 @@ css("p.my-comp", {
     "border-radius": "10px"
 });
 
-var randomColor = () => "#" + Math.floor(Math.random() * 16777215).toString(16);
+var crudeRandomColor = () => "#" + Math.floor(Math.random() * 0xffffff).toString(16);
 
 let exampleOutput = div(null,
     "The css function add global css selectors. Mu allows you to use CSS as you would normally.",
     p({ class: "my-comp" }, "This paragraph is red based on its class"),
     p(null, "Another paragraph will show normally."),
-    elt("button", { onclick: () => { backgroundColor.setValue(randomColor()) } }, "click me")
+    elt("button", { onclick: () => { backgroundColor.value = crudeRandomColor() } }, "click me")
 );
 
 export default {

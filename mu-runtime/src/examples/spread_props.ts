@@ -1,4 +1,4 @@
-import { Attributes, elt, div, MuElt, p } from "../mu";
+import { Attributes, elt, div, Dynamic<MuElt>, p } from "../mu";
 
 interface User {
     firstName: string;
@@ -22,7 +22,7 @@ function employee(props: Employee) {
 }
 
 
-function person(props: Employee & User, ...children: MuElt[]) {
+function person(props: Employee & User, ...children: Dynamic<MuElt>[]) {
     return div(null,
         user(props),
         employee(props),

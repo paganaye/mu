@@ -4,9 +4,9 @@ import { ExamplePage } from "./examples";
 let count = new Var(1);
 
 let exampleOutput = div(null,
-    elt("button", { onclick: () => count.setValue(count.getValue() + 1) }, "Count is ", count),
+    elt("button", { onclick: () => count.value += 1 }, "Count is ", count),
     p(null, "count is ", count),
-    p(null, "count time 2 is ", watch([count], (count) => count.getValue() * 2))
+    p(null, "count time 2 is ", watch([count], (count) => count.value * 2))
 );
 
 export default {

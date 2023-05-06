@@ -1,5 +1,5 @@
 import { Page, Section } from "./examples/examples";
-import { div, each, elt, Attributes } from "./mu";
+import { div, elt, Attributes, each } from "./mu";
 
 
 let sections: Section[] = [
@@ -176,9 +176,14 @@ let sections: Section[] = [
 export let pageByUrl: { [key: string]: Page } = {}
 export let homePage = sections[0].pages[0];
 
+
+if (location.hostname === "localhost") {
+    sections[0].pages.unshift({ page: "Test page (for devs)", reload: true, url: "test" })
+}
+
 sections.forEach(s => {
     s.pages.forEach(p => {
-        p.url = p.page.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+        if (!p.url) p.url = p.page.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
         pageByUrl[p.url] = p;
     })
 })
@@ -190,10 +195,12 @@ export function nav(attr?: Attributes) {
     return elt("nav", attr,
         elt("h2", null, "Menu"),
         // 
-        each(sections, (s) => {
-            return elt("h3", {}, s.section, () => {
-                return each(s.pages, (p) => div(null, elt("a", { href: "#" + p.url }, p.page)))
-            })
-        })
+        each(sections, (s) =>
+            elt("h3", {}, s.section,
+                each(s.pages, (p) =>
+                    div(null, elt("a", { href: "#" + p.url }, p.page))
+                )
+            )
+        )
     );
 }

@@ -6,7 +6,7 @@ type State = "Liquid" | "Solid" | "Gas";
 let state = new Var<State>("state", "Solid");
 
 function transitionButton(text: string, newState: State) {
-    return elt("button", { onclick: () => { state.setValue(newState) } }, text);
+    return elt("button", { onclick: () => { state.value = newState } }, text);
 }
 
 let exampleOutput = div(null,
@@ -14,7 +14,7 @@ let exampleOutput = div(null,
     state,
     watch([state], () => {
 
-        switch (state.getValue()) {
+        switch (state.value) {
             case "Gas":
                 return div(null, transitionButton("Condensation", "Liquid"), transitionButton("Deposition", "Solid"))
             case "Liquid":

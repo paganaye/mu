@@ -4,10 +4,10 @@ import { Var, elt, watch } from "../mu";
 let loggedIn = new Var(false);
 
 let exampleOutput = watch([loggedIn], () => {
-    if (loggedIn.getValue()) {
-        return elt("button", { onclick: () => loggedIn.setValue(false) }, "Log out")
+    if (loggedIn.value) {
+        return elt("button", { onclick: () => loggedIn.value = false }, "Log out")
     } else {
-        return elt("button", { onclick: () => loggedIn.setValue(true) }, "Log in")
+        return elt("button", { onclick: () => loggedIn.value = true }, "Log in")
     }
 });
 
