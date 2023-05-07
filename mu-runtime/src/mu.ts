@@ -188,10 +188,11 @@ class MuElt<THTMLElement extends HTMLElement> extends MuNodeBase<THTMLElement> {
 
 
     private applyAttributes(domElt: THTMLElement) { // attrs?: Attributes) {
+        if (!this.attributes) return;
         for (let name in this.attributes) {
             let value: ExprOrValue<Attribute> = this.attributes[name];
             if (typeof value === 'object' && name === "style") {
-                if (value instanceof Expr) value = value.value;
+                value = this.toCss(value as any);
                 if (value) domElt.setAttribute("style", String(value))
                 else domElt.removeAttribute("style")
             }
@@ -200,6 +201,17 @@ class MuElt<THTMLElement extends HTMLElement> extends MuNodeBase<THTMLElement> {
             }
             else domElt.setAttribute(name, value as any);
         }
+    }
+
+    toCss(obj: object): string {
+        while (obj instanceof Expr) obj = obj.value;
+        let result: string[] = [];
+        for (let name in obj) {
+            let value: ExprOrValue<string> = (obj as any)[name];
+            if (value) result.push(name + ":" + String(value));
+            else result.push(name);
+        }
+        return result.join(";");
     }
 
     calcValue(): void {
@@ -272,7 +284,11 @@ class DynamicNode extends MuNodeBase<HTMLElement | Comment | Text> {
                 break;
             default:
                 if (sourceValue instanceof Node) {
-                    this.value = sourceValue as any;
+                    if (this.previousValue) {
+                        this.previousValue.parentElement?.replaceChild(sourceValue as any, this.previousValue);
+                    } else {
+                        this.value = sourceValue as any;
+                    }
                     return;
                 }
                 if (sourceValue === null) sourceValue = "null";
@@ -450,6 +466,39 @@ export function mount(app: MuNode, recipient?: HTMLElement | string) {
 
 }
 
+interface CompiledCss {
+    content: string;
+    styleElt: HTMLStyleElement;
+}
+
+let globalCss: Record<string, CompiledCss> = {};
+
+
+export function css(selectors: string | string[], attr: Attribute) {
+    function applyCss(selector: string, attr: any) {
+        let newContent = String(attr);
+        let current = globalCss[selector];
+        if (newContent) {
+            if (!current) {
+                current = {
+                    content: newContent,
+                    styleElt: document.createElement("style")
+                }
+                document.head.appendChild(current.styleElt);
+                globalCss[selector] = current;
+            }
+            current.styleElt.innerHTML = selector + " {\n  " + newContent + "\n}";
+        } else if (current) {
+            current.styleElt.remove();
+            delete globalCss[selector];
+        }
+    }
+    let selector: string = Array.isArray(selectors) ? selectors.join(', ') : selectors;
+    while (attr instanceof Expr) attr = attr.value;
+    applyCss(selector, attr)
+}
+
+
 function isObjectOrArray(o: any) {
     return typeof o === 'object' && o !== null;
 }
@@ -470,3 +519,8 @@ export function elt(tag: string, attributes: Attributes, ...children: EltChildre
 export function div(attributes: Attributes, ...children: EltChildren) {
     return new MuElt<HTMLDivElement>("div", attributes, ...children);
 }
+
+export function p(attributes: Attributes, ...children: EltChildren) {
+    return new MuElt<HTMLDivElement>("p", attributes, ...children);
+}
+
