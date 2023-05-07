@@ -3,8 +3,8 @@ export type ExprOrValue<T> = T | Expr<T>;
 export type EltData = string | number | boolean | null | undefined | Error | MuNode | void;
 export type EltChildren = (ExprOrValue<EltData> | undefined | void)[]
 
-export type Attribute = string | number | boolean | null | undefined | ExprOrValue<Attribute>[] | { [key: string]: ExprOrValue<Attribute> } | Error | Function;
-export type Attributes = Record<string, ExprOrValue<Attribute>> | null | undefined;
+export type AttributeValue = string | number | boolean | null | undefined | { [key: string]: ExprOrValue<AttributeValue> } | Error | Function;
+export type Attributes = Record<string, ExprOrValue<AttributeValue>> | null | undefined;
 
 // more advanced type used to infer Func arguments
 type ExprType<T> = T extends Expr<infer T> ? T : never
@@ -190,7 +190,7 @@ class MuElt<THTMLElement extends HTMLElement> extends MuNodeBase<THTMLElement> {
     private applyAttributes(domElt: THTMLElement) { // attrs?: Attributes) {
         if (!this.attributes) return;
         for (let name in this.attributes) {
-            let value: ExprOrValue<Attribute> = this.attributes[name];
+            let value: ExprOrValue<AttributeValue> = this.attributes[name];
             if (typeof value === 'object' && name === "style") {
                 value = this.toCss(value as any);
                 if (value) domElt.setAttribute("style", String(value))
@@ -439,10 +439,11 @@ class MemberVar<T> extends Var<T> {
 
 export class Func<TExprs extends Expr<unknown>[], TResult> extends Expr<TResult> {
 
-    constructor(readonly args: [...TExprs], readonly lambda: (...args: ExprTypes<TExprs>) => TResult) {
+    constructor(readonly args: [...TExprs], readonly lambda: (...args: ExprTypes<TExprs>) => TResult, immediate: boolean = true) {
         super(undefined, undefined, undefined);
 
         this.listenTo(...args);
+        if (immediate) this.onValueInvalidated();
     }
 
     override calcValue(): void {
@@ -474,7 +475,7 @@ interface CompiledCss {
 let globalCss: Record<string, CompiledCss> = {};
 
 
-export function css(selectors: string | string[], attr: Attribute) {
+export function css(selectors: string | string[], attr: ExprOrValue<AttributeValue>) {
     function applyCss(selector: string, attr: any) {
         let newContent = String(attr);
         let current = globalCss[selector];
@@ -494,6 +495,12 @@ export function css(selectors: string | string[], attr: Attribute) {
         }
     }
     let selector: string = Array.isArray(selectors) ? selectors.join(', ') : selectors;
+    if (attr instanceof Expr) {
+        let f = new Func([attr], (a) => {
+            applyCss(selector, a);
+        });
+
+    }
     while (attr instanceof Expr) attr = attr.value;
     applyCss(selector, attr)
 }
