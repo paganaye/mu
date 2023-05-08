@@ -1,20 +1,27 @@
-import { Var, css, div, mount } from "./mu";
+import { Var, css, div, mount, p } from "./mu";
 
-document.body.innerHTML = `<div><a href="/">Main Mu app</a></div><h1 style="font-family:monospace;">Test App</h1><div id="test-page">...</div>`
+document.body.innerHTML = `<div><a href="/">Main Mu app</a></div><h1 style="font-family:monospace;">Test Page</h1><div id="test-page">...</div>`
 
 window.onhashchange = () => document.location.reload();
 
+let backgroundColor = new Var("#f00");
 
-let testPage = div(null, "Test")
+css("p.my-comp", {
+    "background-color": backgroundColor,
+    "color": "white",
+    padding: "10px",
+    "border-radius": "10px"
+});
 
-let var1 = new Var("font-size: 5px");
+var crudeRandomColor = () => {
+    return "#" + Math.floor(Math.random() * 0xffffff).toString(16);
+}
 
-css("div", var1);
+let testPage = p({ class: "my-comp" }, "This paragraph is red based on its class");
 
-setTimeout(() => {
-    var1.value = "font-size: 50px"
+setInterval(() => {
+    backgroundColor.value = crudeRandomColor()
 }, 1000);
 
 mount(testPage, "test-page");
-
 

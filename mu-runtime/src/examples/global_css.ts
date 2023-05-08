@@ -10,7 +10,9 @@ css("p.my-comp", {
     "border-radius": "10px"
 });
 
-var crudeRandomColor = () => "#" + Math.floor(Math.random() * 0xffffff).toString(16);
+var crudeRandomColor = () => {
+    return "#" + Math.floor(Math.random() * 0xffffff).toString(16);
+}
 
 let exampleOutput = div(null,
     "The css function add global css selectors. Mu allows you to use CSS as you would normally.",

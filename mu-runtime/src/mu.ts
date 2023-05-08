@@ -1,14 +1,11 @@
 export type ExprOrValue<T> = T | Expr<T>;
 
-export type EltData = string | number | boolean | null | undefined | Error | MuNode | void;
+export type EltData = string | number | boolean | null | undefined | Error | MuNode | void | (() => EltData);
+export type MuNode = MuNodeBase<HTMLElement | Comment | Text>;
 export type EltChildren = (ExprOrValue<EltData> | undefined | void)[]
 
 export type AttributeValue = string | number | boolean | null | undefined | { [key: string]: ExprOrValue<AttributeValue> } | Error | Function;
 export type Attributes = Record<string, ExprOrValue<AttributeValue>> | null | undefined;
-
-// more advanced type used to infer Func arguments
-type ExprType<T> = T extends Expr<infer T> ? T : never
-type ExprTypes<T> = { [K in keyof T]: ExprType<T[K]> };
 
 
 export class Expr<T> {
@@ -127,10 +124,14 @@ export class Expr<T> {
         }
     }
 
+    setParentExpr(_arg0: any) {
+        console.warn("TODO Expr.setParentExpr")
+        //throw new Error("Method not implemented.");
+    }
+
 }
 
 
-export type MuNode = MuNodeBase<HTMLElement | Comment | Text>;
 
 abstract class MuNodeBase<T> extends Expr<T> {
     readonly #exprListeners: Expr<any>[] = [];
@@ -192,9 +193,15 @@ class MuElt<THTMLElement extends HTMLElement> extends MuNodeBase<THTMLElement> {
         for (let name in this.attributes) {
             let value: ExprOrValue<AttributeValue> = this.attributes[name];
             if (typeof value === 'object' && name === "style") {
-                value = this.toCss(value as any);
-                if (value) domElt.setAttribute("style", String(value))
-                else domElt.removeAttribute("style")
+                let css = toCss(value as any);
+                if (typeof css === 'string') domElt.setAttribute("style", css)
+                else {
+                    let func = new Func([css], (f) => {
+                        if (f) domElt.setAttribute("style", f)
+                        domElt.removeAttribute(f)
+                    })
+                    func.setParentExpr(this);
+                }
             }
             else if (name.startsWith('on') && typeof value === "function") {
                 (domElt as any)[name] = value;
@@ -203,16 +210,7 @@ class MuElt<THTMLElement extends HTMLElement> extends MuNodeBase<THTMLElement> {
         }
     }
 
-    toCss(obj: object): string {
-        while (obj instanceof Expr) obj = obj.value;
-        let result: string[] = [];
-        for (let name in obj) {
-            let value: ExprOrValue<string> = (obj as any)[name];
-            if (value) result.push(name + ":" + String(value));
-            else result.push(name);
-        }
-        return result.join(";");
-    }
+
 
     calcValue(): void {
         if (!this.domElt) this.domElt = document.createElement(this.tag) as THTMLElement;
@@ -350,10 +348,17 @@ const defaultRepeatOptions: RepeatOptions = {
     containerTag: "div",
 }
 
-export function iif(cond: Expr<boolean>, thenValue: Expr<number>, elseValue: Expr<number>): Expr<number> {
+export function iif(cond: Expr<boolean>, thenValue: Expr<any>, elseValue: Expr<any>): Expr<any> {
     let res = new Func([cond, thenValue, elseValue], (c, t, f) => c ? t : f)
     return res;
 }
+
+export function watch(variables: Expr<any>[] | Expr<any>, content: Expr<any> | (() => any)): Expr<any> {
+    if (!Array.isArray(variables)) variables = [variables];
+    let res = new Func(variables, () => content);
+    return res;
+}
+
 
 export function each<T>(items: T[],
     content: (item: T, idx: number) => MuElt<any> | void,
@@ -437,6 +442,10 @@ class MemberVar<T> extends Var<T> {
     }
 }
 
+// helper types used to infer Func arguments
+type ExprType<T> = T extends Expr<infer T> ? T : never
+type ExprTypes<T> = { [K in keyof T]: ExprType<T[K]> };
+
 export class Func<TExprs extends Expr<unknown>[], TResult> extends Expr<TResult> {
 
     constructor(readonly args: [...TExprs], readonly lambda: (...args: ExprTypes<TExprs>) => TResult, immediate: boolean = true) {
@@ -450,6 +459,9 @@ export class Func<TExprs extends Expr<unknown>[], TResult> extends Expr<TResult>
         let argsValues = this.args.map(m => m.value);
         super.value = this.lambda(...(argsValues as any));
     }
+
+
+
 }
 
 export function mount(app: MuNode, recipient?: HTMLElement | string) {
@@ -467,44 +479,73 @@ export function mount(app: MuNode, recipient?: HTMLElement | string) {
 
 }
 
-interface CompiledCss {
-    content: string;
-    styleElt: HTMLStyleElement;
+type CssFragment = string | Expr<any>;
+
+let globalStyles: Record<string, GlobalStyleElt> = {};
+
+function toCss(obj: object): string | Expr<string> {
+    while (obj instanceof Expr) obj = obj.value;
+    let cssFragments: CssFragment[] = [];
+    for (let name in obj) {
+        let value: ExprOrValue<string> = (obj as any)[name];
+        if (value) {
+            if (value instanceof Expr) cssFragments.push(name + ":", value, ";");
+            else cssFragments.push(name + ":" + String(value) + ";");
+        }
+        else cssFragments.push(name + ";");
+
+    }
+    let vars = cssFragments.filter(c => c instanceof Expr) as Expr<string>[];
+    if (vars.length == 0) return cssFragments.join(";");
+    else return new Func([...vars], (..._) => {
+        let res = cssFragments.map(f => {
+            if (f instanceof Expr) return f.value;
+            else return f;
+        })
+        return res.join("");
+    })
 }
 
-let globalCss: Record<string, CompiledCss> = {};
 
+class GlobalStyleElt extends MuElt<HTMLStyleElement> {
+    source: string | Expr<string> = "";
+    //, readonly attr: ExprOrValue<string>
+    constructor(readonly selector: string) {
+        super("style");
+        document.head.appendChild(this.value);
+    }
 
-export function css(selectors: string | string[], attr: ExprOrValue<AttributeValue>) {
-    function applyCss(selector: string, attr: any) {
-        let newContent = String(attr);
-        let current = globalCss[selector];
-        if (newContent) {
-            if (!current) {
-                current = {
-                    content: newContent,
-                    styleElt: document.createElement("style")
-                }
-                document.head.appendChild(current.styleElt);
-                globalCss[selector] = current;
-            }
-            current.styleElt.innerHTML = selector + " {\n  " + newContent + "\n}";
-        } else if (current) {
-            current.styleElt.remove();
-            delete globalCss[selector];
+    setCssExpr(attr: ExprOrValue<AttributeValue>) {
+        if (typeof attr === 'string') {
+            this.source = String(attr);
+        } else {
+            this.source = toCss(attr as any);
+            (this.source as Expr<any>).addListener(this,true);
         }
     }
-    let selector: string = Array.isArray(selectors) ? selectors.join(', ') : selectors;
-    if (attr instanceof Expr) {
-        let f = new Func([attr], (a) => {
-            applyCss(selector, a);
-        });
 
+    onObservedValueChange(_value: Expr<any>): void {
+        super.onObservedValueChange(_value);
     }
-    while (attr instanceof Expr) attr = attr.value;
-    applyCss(selector, attr)
+
+    override calcValue(): void {
+        super.calcValue()
+        let value = (typeof this.source === 'string') ? this.source : this.source.value;
+
+        value = this.selector + " {\n" + value + "\n}"
+
+        if (this.domElt) this.domElt.innerHTML = value;
+    }
 }
 
+export function css(selectors: string | string[], attr: ExprOrValue<AttributeValue>) {
+    let selector: string = Array.isArray(selectors) ? selectors.join(', ') : selectors;
+    let current = globalStyles[selector];
+    if (!current) {
+        current = new GlobalStyleElt(selector);
+        current.setCssExpr(attr);
+    }
+}
 
 function isObjectOrArray(o: any) {
     return typeof o === 'object' && o !== null;

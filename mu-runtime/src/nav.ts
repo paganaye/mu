@@ -11,6 +11,7 @@ let sections: Section[] = [
     }, {
         section: "INSPIRATIONS", pages: [
             { page: "Inspirations" },
+            { page: "Benchmark", reload: true }
         ]
     }, {
         section: "STYLING", pages: [

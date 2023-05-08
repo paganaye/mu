@@ -1,5 +1,5 @@
 import { ExamplePage } from "./examples/examples.js";
-import { Var, div, mount, elt } from "./mu.js"
+import { Var, div, mount, elt, iif } from "./mu.js"
 import { homePage, nav, pageByUrl } from "./nav.js"
 //----------------------------
 
@@ -14,17 +14,20 @@ async function loadCurrentPage() {
     return
   }
 
-  let part1: any = await new Promise((resolve, reject) => {
+  let source: any = await new Promise((resolve, reject) => {
     var client = new XMLHttpRequest();
     client.open('GET', "/src/examples/" + page.url + ".ts?raw"); // raw makes vite expose the .ts (not compiled)
     let source: string = "";
     client.onload = () => {
       if (client.status === 0 || (client.status >= 200 && client.status < 400)) {
         source = client.responseText;
-        let cleanedSource = source.replace(/^export default '|';$/m, '').replace(/\\n/g, '\n')
+        let cleanedSource = source
+          .replace(/^export default '|';$/m, '').replace(/\\n/g, '\n')
           .replace(/import.*\.\/examples\".*\n/, "")
-          .replace(/import.*\.\.\/mu\".*\n+/, "")
-          .replace(/export default(.|\n)*/, "")
+          .replace(/from \"..\/mu\"/, "from \"mu\"")
+//          .replace(/import.*\.\.\/mu\".*\n+/, "")
+          .replace(/^export default `/, "")
+          .replace(/export default \{(.|\n)* ?/, "")
           .replace(/let exampleOutput = +/, "return ")
         resolve(cleanedSource)
       } else {
@@ -33,26 +36,26 @@ async function loadCurrentPage() {
     };
     client.send();
   });
-  let part2: any;
-
+  let output: any;
+  let examplePage: ExamplePage | undefined
   try {
     let importResult = await import("./examples/" + page.url + ".ts");
-    let examplePage = importResult.default as ExamplePage;
+    examplePage = importResult.default as ExamplePage;
     console.log({ examplePage });
-    part2 = examplePage.content as any;
+    output = examplePage.content as any;
   } catch (error: any) {
     console.error(error);
-    part2 = "The page " + page.url + " doesn't exist yet, doesn't compile or is not accessible now.\n" + String(error)
+    output = "The page " + page.url + " doesn't exist yet, doesn't compile or is not accessible now.\n" + String(error)
   }
 
   currentPage.value = div(null,
-    // watch(null as any, [$page], () => {
-    // return div({},
     elt("h1", null, page.page),
-    elt("h2", null, "source"),
-    elt("pre", {}, part1),
-    elt("h2", null, "output"),
-    elt("pre", {}, part2));
+    iif(new Var(examplePage?.hideSource || false), div(null), div(null,
+      elt("h2", null, "source"),
+      elt("pre", {}, source),
+      elt("h2", null, "output")
+    )),
+    elt("div", {}, output));
 }
 
 const alwaysReload = true;
