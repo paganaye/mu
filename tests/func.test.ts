@@ -11,9 +11,8 @@ describe('Func', () => {
     `;
     const transpiledJs = compile(muCode);
     expect(transpiledJs).toContain(lines(
-      `import { from } from "rxjs";`,
       `/* MU_FUNC */ function multiplyByTwo(x: number): number {`,
-      `    return from([x * 2]);`,
+      `    return x * 2;`,
       `}`
     ));
   });
@@ -29,14 +28,12 @@ describe('Func', () => {
     `;
     const transpiledJs = compile(muCode);
     expect(transpiledJs).toContain(lines(
-      `import { from } from "rxjs";`,
       `/* MU_FUNC */ function processNumbers(a: number, b: number): number {`,
       `    const sum = a + b;`,
-      `    const result = sum * 2;`,
-      `    return from([result - 5]);`, // Ensure the final expression is wrapped
+      `    const result = sum * 2;`, // Ensure the final expression is wrapped
+      `    return result - 5;`,
       `}`
     ));
   });
 
 });
-

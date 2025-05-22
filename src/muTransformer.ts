@@ -4,8 +4,6 @@ import { checkPurity } from './checkPurity';
 
 export class MuTransformer {
   private factory: ts.NodeFactory;
-  private needsRxjsFromImport = false;
-  private hasRxjsFromImport = false;
 
   constructor(readonly typeChecker: ts.TypeChecker, readonly context: ts.TransformationContext) {
     this.factory = context.factory;
@@ -15,29 +13,28 @@ export class MuTransformer {
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier) && node.moduleSpecifier.text === 'rxjs') {
       if (node.importClause?.namedBindings && ts.isNamedImports(node.importClause.namedBindings)) {
         if (node.importClause.namedBindings.elements.some(element => element.name.text === 'from')) {
-          this.hasRxjsFromImport = true;
         }
       }
     }
 
     // --- Handle JSX Node Transformation (mu.elt creation) ---
     if (ts.isJsxElement(node)) {
-        return createMuEltCall(this.factory, node.openingElement.tagName, node.openingElement.attributes, node.children, this.visitor, this.context);
+      return createMuEltCall(this.factory, node.openingElement.tagName, node.openingElement.attributes, node.children, this.visitor, this.context);
     } else if (ts.isJsxSelfClosingElement(node)) {
-        return createMuEltCall(this.factory, node.tagName, node.attributes, undefined, this.visitor, this.context);
+      return createMuEltCall(this.factory, node.tagName, node.attributes, undefined, this.visitor, this.context);
     } else if (ts.isJsxFragment(node)) {
-        return createMuEltCall(this.factory, this.factory.createPropertyAccessExpression(this.factory.createIdentifier("mu"), this.factory.createIdentifier("Fragment")), null, node.children, this.visitor, this.context);
+      return createMuEltCall(this.factory, this.factory.createPropertyAccessExpression(this.factory.createIdentifier("mu"), this.factory.createIdentifier("Fragment")), null, node.children, this.visitor, this.context);
     } else if (ts.isJsxText(node)) {
-        const trimmedText = node.text.trim();
-        if (trimmedText === "") {
-            return undefined;
-        }
-        return this.factory.createStringLiteral(trimmedText);
-    } else if (ts.isJsxExpression(node)) {
-        if (node.expression) {
-            return ts.visitNode(node.expression, this.visitor); // Correct usage of ts.visitNode
-        }
+      const trimmedText = node.text.trim();
+      if (trimmedText === "") {
         return undefined;
+      }
+      return this.factory.createStringLiteral(trimmedText);
+    } else if (ts.isJsxExpression(node)) {
+      if (node.expression) {
+        return ts.visitNode(node.expression, this.visitor); // Correct usage of ts.visitNode
+      }
+      return undefined;
     }
 
     // --- Process Function Declarations (func and proc) ---
@@ -54,21 +51,13 @@ export class MuTransformer {
 
         throwIfDiagnosticsNotEmpty(functionDiagnostics);
 
-        this.needsRxjsFromImport = true;
 
         const transformedBody = this.factory.createBlock(
-          // CORRECTED: Apply visitor to each statement in the map, using ts.visitNode
           node.body?.statements.map(statement => {
             const visitedStatement = ts.visitNode(statement, this.visitor); // Correct usage of ts.visitNode
             if (visitedStatement) {
               if (ts.isReturnStatement(visitedStatement) && visitedStatement.expression) {
-                return this.factory.createReturnStatement(
-                  this.factory.createCallExpression(
-                    this.factory.createIdentifier("from"),
-                    undefined,
-                    [this.factory.createArrayLiteralExpression([visitedStatement.expression])]
-                  )
-                );
+                return visitedStatement; // Return the statement as is, without 'from'
               }
               return visitedStatement;
             }
@@ -169,23 +158,6 @@ export class MuTransformer {
   public transformSourceFile(sourceFile: ts.SourceFile): ts.SourceFile {
     const transformedSourceFile = ts.visitNode(sourceFile, this.visitor) as ts.SourceFile;
 
-    if (this.needsRxjsFromImport && !this.hasRxjsFromImport) {
-      const fromImport = this.factory.createImportDeclaration(
-        undefined,
-        this.factory.createImportClause(
-          false,
-          undefined,
-          this.factory.createNamedImports([
-            this.factory.createImportSpecifier(false, undefined, this.factory.createIdentifier("from"))
-          ])
-        ),
-        this.factory.createStringLiteral("rxjs")
-      );
-      return this.factory.updateSourceFile(
-        transformedSourceFile,
-        [fromImport, ...transformedSourceFile.statements]
-      );
-    }
 
     return transformedSourceFile;
   };

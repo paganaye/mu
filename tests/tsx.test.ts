@@ -25,9 +25,8 @@ describe('tsx', () => {
 
     // Expected output using React's new JSX transform (_jsx function)
     expect(transpiledJs).toContain(lines(
-      `import { from } from "rxjs";`,
       `/* MU_FUNC */ function MyComponent() {`,
-      `    return from([mu.elt("p", null, "Hello Mu!")]);`,
+      `    return mu.elt("p", null, "Hello Mu!");`,
       `}`));
   });
 
@@ -41,11 +40,9 @@ describe('tsx', () => {
     const transpiledJs = compile(muCode);
 
     expect(transpiledJs).toContain(lines(
-      `import { from } from "rxjs";`,
       `/* MU_FUNC */ function MyFragmentComponent(): JSX.Element {`,
-      `    return from([mu.fragment(mu.elt("span", null, "Part 1"), mu.elt("span", null, "Part 2"))]);`,
+      `    return mu.fragment(mu.elt("span", null, "Part 1"), mu.elt("span", null, "Part 2"));`,
       `}`
     ));
   });
 });
-
